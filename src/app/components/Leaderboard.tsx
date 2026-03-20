@@ -1,4 +1,4 @@
-import { Trophy, Clock, TrendingUp } from "lucide-react";
+import { Clock, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import type { LapRecord, Scout } from "./types";
 

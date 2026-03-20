@@ -41,6 +41,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
+        if (!workbook.SheetNames.length) throw new Error("Fichier Excel vide");
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ShieldCheck, Lock, AlertTriangle } from "lucide-react";
 
 // Mot de passe admin — à changer selon vos besoins
@@ -22,6 +22,9 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
+  const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current); }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +34,8 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
     } else {
       setError(true);
       setShake(true);
-      setTimeout(() => setShake(false), 500);
+      if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+      shakeTimerRef.current = setTimeout(() => setShake(false), 500);
       setPassword("");
     }
   };

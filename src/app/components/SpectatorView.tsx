@@ -41,7 +41,9 @@ export function SpectatorView() {
     if (state.lapRecords.length > lastLapCount) {
       const newLap = state.lapRecords[state.lapRecords.length - 1];
       setFlashLap(newLap);
-      setTimeout(() => setFlashLap(null), 4000);
+      const t = setTimeout(() => setFlashLap(null), 4000);
+      setLastLapCount(state.lapRecords.length);
+      return () => clearTimeout(t);
     }
     setLastLapCount(state.lapRecords.length);
   }, [state.lapRecords.length, state.lapRecords]);
