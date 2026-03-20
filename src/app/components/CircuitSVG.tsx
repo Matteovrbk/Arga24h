@@ -152,7 +152,8 @@ export function CircuitSVG({
     <div className="relative w-full" style={{ height: 280 }}>
       <MapContainer
         center={MAP_CENTER}
-        zoom={15}
+        zoom={14.8}
+        zoomSnap={0}
         zoomControl={false}
         attributionControl={false}
         className="w-full rounded"

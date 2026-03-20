@@ -87,6 +87,16 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos, setBike1MapPos] = useState(0);
   const [bike2MapPos, setBike2MapPos] = useState(0);
+
+  // Compute real map progress from elapsed time / avg lap time
+  const bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).slice(-10);
+  const bike1AvgLap = bike1RecentLaps.length > 0 ? bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike1RecentLaps.length : 0;
+  const bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
+  const bike2AvgLap = bike2RecentLaps.length > 0 ? bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike2RecentLaps.length : 0;
+  const bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
+  const bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
+  const bike1Progress = bike1AvgLap > 0 && state.bike1.lapStartTime !== null ? Math.min(0.99, bike1Elapsed / bike1AvgLap) : bike1MapPos;
+  const bike2Progress = bike2AvgLap > 0 && state.bike2.lapStartTime !== null ? Math.min(0.99, bike2Elapsed / bike2AvgLap) : bike2MapPos;
   const [showScoutManager, setShowScoutManager] = useState(false);
   const [showEventSetup, setShowEventSetup] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
@@ -384,20 +394,19 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         [bikeKey]: { ...prev[bikeKey], queue: [...prev[bikeKey].queue, scoutId] },
       }));
     },
-    onRemoveFromQueue: (scoutId: string) => {
-      updateState((prev) => ({
-        ...prev,
-        [bikeKey]: { ...prev[bikeKey], queue: prev[bikeKey].queue.filter((id) => id !== scoutId) },
-      }));
-    },
-    onMoveInQueue: (scoutId: string, direction: "up" | "down") => {
+    onRemoveFromQueue: (index: number) => {
       updateState((prev) => {
         const queue = [...prev[bikeKey].queue];
-        const idx = queue.indexOf(scoutId);
-        if (idx === -1) return prev;
-        const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+        queue.splice(index, 1);
+        return { ...prev, [bikeKey]: { ...prev[bikeKey], queue } };
+      });
+    },
+    onMoveInQueue: (index: number, direction: "up" | "down") => {
+      updateState((prev) => {
+        const queue = [...prev[bikeKey].queue];
+        const swapIdx = direction === "up" ? index - 1 : index + 1;
         if (swapIdx < 0 || swapIdx >= queue.length) return prev;
-        [queue[idx], queue[swapIdx]] = [queue[swapIdx], queue[idx]];
+        [queue[index], queue[swapIdx]] = [queue[swapIdx], queue[index]];
         return { ...prev, [bikeKey]: { ...prev[bikeKey], queue } };
       });
     },
@@ -429,7 +438,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     updateState((prev) => ({ ...prev, scouts: prev.scouts.filter((s) => s.id !== id) }));
   };
   const handleReset = () => {
-    if (window.confirm("CONFIRMATION REQUISE: Réinitialiser toutes les données de course ?")) {
+    if (window.confirm("CONFIRMATION REQUISE\n\nRéinitialiser toutes les données de course ?\n\n• Tours, temps, commentaires : supprimés\n• Scouts importés : conservés\n• Configuration event : réinitialisée")) {
       updateState((prev) => ({
         ...prev,
         bike1: INITIAL_BIKE_STATE,
@@ -439,11 +448,11 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         commentary: [],
         lapFlags: {},
         raceStarted: false,
-        eventConfig: undefined,
+        eventConfig: DEFAULT_EVENT_CONFIG,
       }));
       setBike1MapPos(0);
       setBike2MapPos(0);
-      toast.success("Système réinitialisé");
+      toast.success("Course réinitialisée");
     }
   };
 
@@ -951,8 +960,8 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                   style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "20px 20px" }}
                 />
                 <CircuitSVG
-                  bike1Progress={bike1MapPos}
-                  bike2Progress={bike2MapPos}
+                  bike1Progress={bike1Progress}
+                  bike2Progress={bike2Progress}
                   bike1Active={!!rider1}
                   bike2Active={!!rider2}
                   bike1Rider={rider1?.name}

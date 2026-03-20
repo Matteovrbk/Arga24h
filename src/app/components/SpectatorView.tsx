@@ -19,8 +19,8 @@ export function SpectatorView() {
   const { messages: chatMessages, sendMessage, isConnected: chatConnected } = useSpectatorChat();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
-  const [bike1MapPos, setBike1MapPos] = useState(0);
-  const [bike2MapPos, setBike2MapPos] = useState(0);
+  const [bike1MapPos] = useState(0);
+  const [bike2MapPos] = useState(0);
   const [flashLap, setFlashLap] = useState<LapRecord | null>(null);
   const [spectatorFilter, setSpectatorFilter] = useState<"all" | "bike1" | "bike2" | "Ungava" | "Argapura">("all");
   const [rightTab, setRightTab] = useState<"leaderboard" | "chat">("leaderboard");
@@ -36,14 +36,15 @@ export function SpectatorView() {
     return () => clearInterval(interval);
   }, []);
 
-  // Simulate GPS
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (state.bike1.currentRiderId) setBike1MapPos((p) => (p + 0.008) % 1);
-      if (state.bike2.currentRiderId) setBike2MapPos((p) => (p + 0.006) % 1);
-    }, 200);
-    return () => clearInterval(interval);
-  }, [state.bike1.currentRiderId, state.bike2.currentRiderId]);
+  // Real map progress: elapsed / avg lap time
+  const _bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).slice(-10);
+  const _bike1AvgLap = _bike1RecentLaps.length > 0 ? _bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike1RecentLaps.length : 0;
+  const _bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
+  const _bike2AvgLap = _bike2RecentLaps.length > 0 ? _bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike2RecentLaps.length : 0;
+  const _bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
+  const _bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
+  const realBike1Pos = _bike1AvgLap > 0 && state.bike1.lapStartTime !== null ? Math.min(0.99, _bike1Elapsed / _bike1AvgLap) : bike1MapPos;
+  const realBike2Pos = _bike2AvgLap > 0 && state.bike2.lapStartTime !== null ? Math.min(0.99, _bike2Elapsed / _bike2AvgLap) : bike2MapPos;
 
   // Auto-scroll chat
   useEffect(() => {
@@ -324,8 +325,8 @@ export function SpectatorView() {
                    style={{ backgroundImage: "radial-gradient(#333 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
               <div className="relative z-10 w-full">
                 <CircuitSVG
-                  bike1Progress={bike1MapPos}
-                  bike2Progress={bike2MapPos}
+                  bike1Progress={realBike1Pos}
+                  bike2Progress={realBike2Pos}
                   bike1Active={!!rider1}
                   bike2Active={!!rider2}
                   bike1Rider={rider1?.name}
