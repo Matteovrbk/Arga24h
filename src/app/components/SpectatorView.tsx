@@ -134,7 +134,7 @@ export function SpectatorView() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333]">
+    <div className="h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333] flex flex-col">
       {/* Top Timing Bar */}
       <header className="h-[40px] bg-[#111] border-b border-[#222] flex items-center justify-between px-4 sticky top-0 z-10">
         <div className="flex items-center gap-4">
@@ -230,7 +230,7 @@ export function SpectatorView() {
         </div>
       )}
 
-      <main className="max-w-[1920px] mx-auto h-[calc(100vh-40px)] flex flex-col md:flex-row">
+      <main className="flex-1 max-w-[1920px] mx-auto w-full flex flex-col md:flex-row overflow-hidden">
         
         {/* LEFT COLUMN: Track Status & Map */}
         <div className="w-full md:w-[400px] flex-shrink-0 border-r border-[#222] flex flex-col bg-[#080808]">
