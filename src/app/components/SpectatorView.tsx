@@ -146,6 +146,18 @@ export function SpectatorView() {
     }
   };
 
+  if (!state.raceStarted) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#eee] flex flex-col items-center justify-center font-['Inter']">
+        <div className="text-center space-y-4">
+          <div className="w-3 h-3 rounded-full bg-[#e11d48] mx-auto animate-pulse" />
+          <div className="text-xs uppercase tracking-[0.3em] text-[#555]">Course non démarrée</div>
+          <div className="text-[#333] text-sm font-['Roboto_Mono']">En attente de l'opérateur...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333]">
       {/* Top Timing Bar */}
@@ -335,7 +347,7 @@ export function SpectatorView() {
             <div className="flex-1 p-4 bg-[#0a0a0a] flex items-center justify-center relative min-h-[250px]">
               <div className="absolute inset-0 opacity-20 pointer-events-none" 
                    style={{ backgroundImage: "radial-gradient(#333 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
-              <div className="relative z-10 w-full h-full max-h-[400px]">
+              <div className="relative z-10 w-full">
                 <CircuitSVG
                   bike1Progress={bike1MapPos}
                   bike2Progress={bike2MapPos}

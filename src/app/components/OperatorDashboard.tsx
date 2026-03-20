@@ -99,11 +99,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const [setupDuration, setSetupDuration] = useState("24");
   const [setupCircuit, setSetupCircuit] = useState("2.2");
 
-  // Auto‑open setup wizard on first launch
-  useEffect(() => {
-    if (!state.eventConfig) setShowEventSetup(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Timer tick
   useEffect(() => {
