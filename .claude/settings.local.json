@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "mcp__claude_ai_Figma__get_design_context",
+      "Bash(for pkg:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/verbe/Desktop/Site pour l'unité scoute/node_modules/$pkg/**)",
+      "Bash(done)",
+      "Bash(npm view:*)",
+      "Bash(find \"C:/Users/verbe/Desktop/Site pour l''''unité scoute/node_modules\" -maxdepth 4 -name package.json -path */react/package.json)",
+      "Bash(find \"C:/Users/verbe/Desktop/Site pour l''''unité scoute/src/app/components/\" -type f \\\\\\(-name *.jsx -o -name *.tsx -o -name *.js -o -name *.ts \\\\\\))",
+      "Bash(rm -rf node_modules package-lock.json)",
+      "Bash(npm install:*)",
+      "Bash(find \"C:/Users/verbe/Desktop/Site pour l''''unité scoute/src\" -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.json \\\\\\))",
+      "Bash(find \"C:/Users/verbe/Desktop/Site pour l''''unité scoute\" \\\\\\(-name *.mp3 -o -name *.wav -o -name *.ogg -o -name *.m4a \\\\\\))",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)"
+    ]
+  }
+}
