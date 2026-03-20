@@ -9,25 +9,26 @@ const STORAGE_KEY = "sp51_state";
 const CHANNEL_NAME = "sp51_sync";
 const FIREBASE_PATH = "sp51/state";
 
-function loadState(): AppState {
-  const defaults: AppState = {
-    scouts: INITIAL_SCOUTS,
-    bike1: INITIAL_BIKE_STATE,
-    bike2: INITIAL_BIKE_STATE,
-    lapRecords: [],
-    eventStartTime: Date.now(),
-    commentary: [],
-    lapFlags: {},
-    raceStarted: true,
+function mergeWithDefaults(parsed: Partial<AppState>): AppState {
+  return {
+    scouts: Array.isArray(parsed.scouts) ? parsed.scouts : [...INITIAL_SCOUTS],
+    bike1: { ...INITIAL_BIKE_STATE, ...parsed.bike1, queue: Array.isArray(parsed.bike1?.queue) ? parsed.bike1.queue : [] },
+    bike2: { ...INITIAL_BIKE_STATE, ...parsed.bike2, queue: Array.isArray(parsed.bike2?.queue) ? parsed.bike2.queue : [] },
+    lapRecords: Array.isArray(parsed.lapRecords) ? parsed.lapRecords : [],
+    eventStartTime: parsed.eventStartTime ?? Date.now(),
+    eventConfig: parsed.eventConfig,
+    commentary: Array.isArray(parsed.commentary) ? parsed.commentary : [],
+    lapFlags: parsed.lapFlags && typeof parsed.lapFlags === "object" ? parsed.lapFlags : {},
+    raceStarted: parsed.raceStarted ?? true,
   };
+}
+
+function loadState(): AppState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...defaults, ...parsed };
-    }
+    if (stored) return mergeWithDefaults(JSON.parse(stored));
   } catch {}
-  return defaults;
+  return mergeWithDefaults({});
 }
 
 function saveState(state: AppState) {
@@ -81,17 +82,7 @@ export function useSharedState(readonly = false) {
       if (isWritingRef.current) return;
       const data = snapshot.val();
       if (data) {
-        const defaults: AppState = {
-          scouts: INITIAL_SCOUTS,
-          bike1: INITIAL_BIKE_STATE,
-          bike2: INITIAL_BIKE_STATE,
-          lapRecords: [],
-          eventStartTime: Date.now(),
-          commentary: [],
-          lapFlags: {},
-          raceStarted: true,
-        };
-        const merged = { ...defaults, ...data };
+        const merged = mergeWithDefaults(data);
         setState(merged);
         saveState(merged);
         try {
