@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useSharedState } from "./useSharedState";
+import { useSpectatorChat } from "./useSpectatorChat";
 import { CircuitSVG } from "./CircuitSVG";
 import {
   BIKE1_COLOR,
@@ -10,16 +11,22 @@ import {
   formatDuration,
 } from "./types";
 import type { LapRecord } from "./types";
-import { ArrowLeft, Clock, Activity, Maximize } from "lucide-react";
+import { ArrowLeft, Clock, Activity, Maximize, Send, MessageSquare } from "lucide-react";
+import QRCode from "react-qr-code";
 
 export function SpectatorView() {
   const { state } = useSharedState(true);
+  const { messages: chatMessages, sendMessage, isConnected: chatConnected } = useSpectatorChat();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos, setBike1MapPos] = useState(0);
   const [bike2MapPos, setBike2MapPos] = useState(0);
   const [flashLap, setFlashLap] = useState<LapRecord | null>(null);
   const [hideAnimateurs, setHideAnimateurs] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatAuthor, setChatAuthor] = useState(() => sessionStorage.getItem("sp51_chat_name") || "");
+  const [showQR, setShowQR] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now() / 1000), 100);
@@ -34,6 +41,11 @@ export function SpectatorView() {
     }, 200);
     return () => clearInterval(interval);
   }, [state.bike1.currentRiderId, state.bike2.currentRiderId]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   // Flash new laps
   const [lastLapCount, setLastLapCount] = useState(state.lapRecords.length);
@@ -390,23 +402,91 @@ export function SpectatorView() {
             })()}
           </div>
 
-          {/* Share URL */}
-          <div className="p-3 bg-[#080808]">
-            <div className="text-[10px] text-[#888] uppercase tracking-widest font-semibold mb-2">
-              Partager
+          {/* Share URL + QR */}
+          <div className="p-3 bg-[#080808] border-t border-[#222]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">Partager</span>
+              <button
+                onClick={() => setShowQR((v) => !v)}
+                className="text-[10px] uppercase tracking-widest text-[#555] hover:text-[#aaa] transition-colors"
+              >
+                {showQR ? "Masquer QR" : "QR Code"}
+              </button>
             </div>
+            {showQR && (
+              <div className="flex justify-center mb-3 p-3 bg-white rounded">
+                <QRCode value={window.location.href} size={120} />
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <code className="flex-1 text-[10px] font-['Roboto_Mono'] text-[#aaa] bg-[#111] border border-[#222] rounded px-2 py-1.5 truncate">
                 {window.location.href}
               </code>
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                }}
+                onClick={() => navigator.clipboard.writeText(window.location.href)}
                 className="px-2 py-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[10px] uppercase tracking-widest text-[#aaa] hover:text-white transition-colors shrink-0"
               >
                 Copier
               </button>
+            </div>
+          </div>
+
+          {/* Live Chat */}
+          <div className="flex flex-col border-t border-[#222] bg-[#060606]" style={{ minHeight: 0, flexShrink: 0 }}>
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#1a1a1a]">
+              <MessageSquare className="w-3 h-3 text-[#555]" />
+              <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">Chat en direct</span>
+              {!chatConnected && <span className="text-[9px] text-[#ef4444] ml-auto">hors-ligne</span>}
+            </div>
+            {/* Messages */}
+            <div className="overflow-y-auto custom-scrollbar px-2 py-1 space-y-1" style={{ maxHeight: 160 }}>
+              {chatMessages.length === 0 && (
+                <div className="text-center text-[#444] py-4 text-[9px] uppercase tracking-widest">Aucun message</div>
+              )}
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className="text-[10px] leading-relaxed">
+                  <span className="font-bold text-[#e2a03f] mr-1">{msg.author}</span>
+                  <span className="text-[#ccc]">{msg.text}</span>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            {/* Input */}
+            <div className="p-2 border-t border-[#1a1a1a] space-y-1.5">
+              <input
+                value={chatAuthor}
+                onChange={(e) => {
+                  setChatAuthor(e.target.value);
+                  sessionStorage.setItem("sp51_chat_name", e.target.value);
+                }}
+                placeholder="Ton prénom…"
+                maxLength={30}
+                className="w-full bg-[#111] border border-[#222] rounded px-2 py-1 text-[10px] text-white placeholder-[#444] focus:outline-none focus:border-[#e2a03f]"
+              />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendMessage(chatText, chatAuthor || "Spectateur");
+                  setChatText("");
+                }}
+                className="flex gap-1"
+              >
+                <input
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  placeholder="Écris un message…"
+                  maxLength={200}
+                  disabled={!chatConnected}
+                  className="flex-1 bg-[#111] border border-[#222] rounded px-2 py-1 text-[10px] text-white placeholder-[#444] focus:outline-none focus:border-[#3b82f6] disabled:opacity-40"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatConnected || !chatText.trim()}
+                  className="px-2 py-1 bg-[#3b82f6] hover:bg-[#2563eb] rounded text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-3 h-3" />
+                </button>
+              </form>
             </div>
           </div>
 
