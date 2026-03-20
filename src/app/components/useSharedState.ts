@@ -15,6 +15,7 @@ function loadState(): AppState {
     eventStartTime: Date.now(),
     commentary: [],
     lapFlags: {},
+    raceStarted: false,
   };
   try {
     const stored = localStorage.getItem(STORAGE_KEY);

@@ -105,14 +105,14 @@ export function CircuitSVG({
   ];
 
   return (
-    <div className="relative w-full" style={{ height: "100%", minHeight: 250 }}>
+    <div className="relative w-full" style={{ height: 280 }}>
       <MapContainer
         center={MAP_CENTER}
         zoom={16}
         zoomControl={false}
         attributionControl={false}
-        className="w-full h-full rounded"
-        style={{ background: dark ? "#0a0a0a" : "#f5f5f5" }}
+        className="w-full rounded"
+        style={{ height: "100%", background: dark ? "#0a0a0a" : "#f5f5f5" }}
       >
         <MapConfig />
 

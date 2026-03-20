@@ -50,6 +50,7 @@ export interface AppState {
   eventConfig?: EventConfig;
   commentary: CommentaryMessage[];
   lapFlags: Record<string, LapFlag>;
+  raceStarted?: boolean;
 }
 
 export const INITIAL_BIKE_STATE: BikeState = {

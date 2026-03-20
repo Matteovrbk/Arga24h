@@ -390,6 +390,8 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         eventStartTime: Date.now(),
         commentary: [],
         lapFlags: {},
+        raceStarted: false,
+        eventConfig: undefined,
       }));
       setBike1MapPos(0);
       setBike2MapPos(0);
@@ -488,7 +490,22 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       eventStartTime: Date.now(),
     }));
     setShowEventSetup(false);
-    toast.success("Configuration sauvegardée — Chrono démarré !");
+    toast.success("Configuration sauvegardée !");
+  };
+
+  const handleLaunchRace = () => {
+    updateState((prev) => ({
+      ...prev,
+      raceStarted: true,
+      eventConfig: {
+        eventName: setupName || DEFAULT_EVENT_CONFIG.eventName,
+        startTime: Date.now(),
+        durationMs: (parseFloat(setupDuration) || 24) * 3600000,
+        circuitLengthKm: parseFloat(setupCircuit) || 2.2,
+      },
+      eventStartTime: Date.now(),
+    }));
+    toast.success("Course lancée ! Bonne chance à tous !");
   };
 
   const rider1 = state.scouts.find((s) => s.id === state.bike1.currentRiderId);
@@ -538,6 +555,104 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
        state.lapRecords.find((r) => r.scoutId === selectedScoutHistory)?.scoutName ??
        "Inconnu")
     : "";
+
+  // ── Pre-race setup screen ────────────────────────────────────
+  if (!state.raceStarted) {
+    return (
+      <div className="dark min-h-screen bg-[#0a0a0a] text-[#ededed] font-['Inter']">
+        <Toaster position="top-center" theme="dark" richColors />
+
+        {/* Setup Header */}
+        <header className="bg-[#111] border-b border-[#222] px-6 py-3 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#e11d48] text-white p-1.5 rounded-md shadow-[0_0_10px_rgba(225,29,72,0.5)]">
+              <Settings2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold tracking-widest uppercase text-white m-0 leading-none">
+                24H Vélo — Saint-Paul 51
+              </h1>
+              <div className="text-[10px] uppercase tracking-widest text-[#888] mt-1">
+                Configuration pré-course
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            title="Déconnexion"
+            className="p-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[#888] hover:text-white transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </header>
+
+        <main className="max-w-5xl mx-auto p-6 space-y-6">
+          {/* Event config */}
+          <div className="bg-[#111] border border-[#222] rounded-lg p-6">
+            <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold mb-5 flex items-center gap-2">
+              <Settings2 className="w-3.5 h-3.5" />
+              Configuration de l'Événement
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1">
+                <label className="text-[10px] text-[#888] uppercase tracking-widest block mb-1.5">Nom de l'événement</label>
+                <input
+                  type="text"
+                  value={setupName}
+                  onChange={(e) => setSetupName(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0a0a0a] border border-[#333] rounded text-sm text-white outline-none focus:border-[#666] font-['Inter']"
+                  placeholder="24H Vélo — Saint-Paul 51"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#888] uppercase tracking-widest block mb-1.5">Durée (heures)</label>
+                <input
+                  type="number"
+                  value={setupDuration}
+                  onChange={(e) => setSetupDuration(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0a0a0a] border border-[#333] rounded text-sm text-white outline-none focus:border-[#666]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#888] uppercase tracking-widest block mb-1.5">Longueur circuit (km)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={setupCircuit}
+                  onChange={(e) => setSetupCircuit(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[#0a0a0a] border border-[#333] rounded text-sm text-white outline-none focus:border-[#666]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Participants */}
+          <div className="bg-[#111] border border-[#222] rounded-lg p-6">
+            <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold mb-5 flex items-center justify-between">
+              <span>Participants</span>
+              <span className="font-['Roboto_Mono'] text-white">{state.scouts.length} inscrits</span>
+            </h2>
+            <ScoutManager
+              scouts={state.scouts}
+              onAddScout={handleAddScout}
+              onRemoveScout={handleRemoveScout}
+              onImportScouts={handleImportScouts}
+            />
+          </div>
+
+          {/* Launch */}
+          <div className="flex justify-center pb-8">
+            <button
+              onClick={handleLaunchRace}
+              className="px-12 py-4 bg-[#22c55e] hover:bg-[#16a34a] text-black text-sm font-bold uppercase tracking-widest rounded-lg shadow-[0_0_30px_rgba(34,197,94,0.3)] hover:shadow-[0_0_40px_rgba(34,197,94,0.5)] transition-all"
+            >
+              Démarrer la Course →
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // ── Render ───────────────────────────────────────────────────
   return (
