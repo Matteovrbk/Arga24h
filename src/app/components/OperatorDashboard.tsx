@@ -284,23 +284,57 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     onNextScout: () => {
       const bike = state[bikeKey];
       if (!bike.currentRiderId) return;
+
+      // Traiter le relais comme un tour complété si le rider roule depuis > 5s
+      let lapTime = 0;
+      let isTooFast = false;
+      let isTooSlow = false;
+      const scout = state.scouts.find((s) => s.id === bike.currentRiderId);
+      if (bike.lapStartTime !== null) {
+        lapTime = Date.now() / 1000 - bike.lapStartTime;
+        if (lapTime > 5) {
+          isTooFast = lapTime < LAP_VALIDATION_THRESHOLDS.tooFastSeconds;
+          isTooSlow = lapTime > LAP_VALIDATION_THRESHOLDS.tooSlowSeconds;
+          if (isTooFast) {
+            toast.warning(`Tour très rapide au relais (${formatTimeFull(lapTime)}) !`, { description: "Tour enregistré" });
+          } else if (isTooSlow) {
+            toast.warning(`Tour très lent au relais (${formatTimeFull(lapTime)})`, { description: "Tour enregistré" });
+          }
+          if (soundEnabled) {
+            if (isTooFast || isTooSlow) playBeep(300, 300);
+            else playBeep(880, 100);
+          }
+        }
+      }
+
+      const flagKey = `${Date.now()}-${bikeId}`;
+
       updateState((prev) => {
         const currentBike = prev[bikeKey];
-        const newLapRecords = [...prev.lapRecords];
-        if (currentBike.lapStartTime !== null) {
-          const lapTime = Date.now() / 1000 - currentBike.lapStartTime;
-          const scout = prev.scouts.find((s) => s.id === currentBike.currentRiderId);
-          if (scout && lapTime > 5) {
-            newLapRecords.push({
+        const shouldCountLap = currentBike.lapStartTime !== null && lapTime > 5 && scout;
+        const newLapRecord = shouldCountLap
+          ? {
               scoutId: scout.id,
               scoutName: scout.name,
               troupe: scout.troupe,
               bikeId,
               lapTime,
               timestamp: Date.now(),
-            });
-          }
-        }
+            }
+          : null;
+        const newCommentary =
+          shouldCountLap
+            ? [
+                ...prev.commentary,
+                {
+                  id: crypto.randomUUID(),
+                  text: `${scout.name} passe le relais après ${formatTimeFull(lapTime)} (V${bikeId})`,
+                  timestamp: Date.now(),
+                  type: "system" as const,
+                },
+              ]
+            : prev.commentary;
+
         if (currentBike.queue.length > 0) {
           const [nextId, ...rest] = currentBike.queue;
           const nextScout = prev.scouts.find((s) => s.id === nextId);
@@ -309,15 +343,34 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           }
           return {
             ...prev,
-            [bikeKey]: { ...currentBike, currentRiderId: nextId, queue: rest, lapStartTime: Date.now() / 1000 },
-            lapRecords: newLapRecords,
+            [bikeKey]: {
+              ...currentBike,
+              currentRiderId: nextId,
+              queue: rest,
+              lapStartTime: Date.now() / 1000,
+              totalLaps: shouldCountLap ? currentBike.totalLaps + 1 : currentBike.totalLaps,
+            },
+            lapRecords: newLapRecord ? [...prev.lapRecords, newLapRecord] : prev.lapRecords,
+            lapFlags: shouldCountLap
+              ? { ...prev.lapFlags, [flagKey]: { type: isTooFast ? "too-fast" : isTooSlow ? "too-slow" : "valid" } }
+              : prev.lapFlags,
+            commentary: newCommentary,
           };
         } else {
           toast.info(`Vélo ${bikeId}: plus personne dans la file`);
           return {
             ...prev,
-            [bikeKey]: { ...currentBike, currentRiderId: null, lapStartTime: null },
-            lapRecords: newLapRecords,
+            [bikeKey]: {
+              ...currentBike,
+              currentRiderId: null,
+              lapStartTime: null,
+              totalLaps: shouldCountLap ? currentBike.totalLaps + 1 : currentBike.totalLaps,
+            },
+            lapRecords: newLapRecord ? [...prev.lapRecords, newLapRecord] : prev.lapRecords,
+            lapFlags: shouldCountLap
+              ? { ...prev.lapFlags, [flagKey]: { type: isTooFast ? "too-fast" : isTooSlow ? "too-slow" : "valid" } }
+              : prev.lapFlags,
+            commentary: newCommentary,
           };
         }
       });
