@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Eye,
   Settings2,
@@ -461,17 +461,21 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   bike2OpsRef.current = bike2Ops;
   bike3OpsRef.current = bike3Ops;
 
-  // ── Handlers ─────────────────────────────────────────────────
-  const handleAddScout = (scout: Scout) => {
+  // ── Handlers (stable refs for ScoutManager memo) ────────────
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const handleAddScout = useCallback((scout: Scout) => {
     updateState((prev) => ({ ...prev, scouts: [...prev.scouts, scout] }));
-  };
-  const handleImportScouts = (newScouts: Scout[]) => {
+  }, [updateState]);
+  const handleImportScouts = useCallback((newScouts: Scout[]) => {
     updateState((prev) => ({ ...prev, scouts: [...prev.scouts, ...newScouts] }));
     toast.success(`${newScouts.length} personnes importées`);
-  };
-  const handleRemoveScout = (id: string) => {
-    const isRiding = state.bike1.currentRiderId === id || state.bike2.currentRiderId === id || state.bike3.currentRiderId === id;
-    const isInQueue = state.bike1.queue.includes(id) || state.bike2.queue.includes(id) || state.bike3.queue.includes(id);
+  }, [updateState]);
+  const handleRemoveScout = useCallback((id: string) => {
+    const st = stateRef.current;
+    const isRiding = st.bike1.currentRiderId === id || st.bike2.currentRiderId === id || st.bike3.currentRiderId === id;
+    const isInQueue = st.bike1.queue.includes(id) || st.bike2.queue.includes(id) || st.bike3.queue.includes(id);
     if (isRiding) {
       toast.error("Ce scout est en train de rouler ! Passez le relais d'abord.");
       return;
@@ -496,13 +500,13 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       };
     });
     toast.success("Scout supprime");
-  };
-  const handleUpdateScout = (id: string, updates: Partial<Pick<Scout, "name" | "troupe" | "role">>) => {
+  }, [updateState]);
+  const handleUpdateScout = useCallback((id: string, updates: Partial<Pick<Scout, "name" | "troupe" | "role">>) => {
     updateState((prev) => ({
       ...prev,
       scouts: prev.scouts.map((s) => s.id === id ? { ...s, ...updates } : s),
     }));
-  };
+  }, [updateState]);
   const handleReset = () => {
     if (window.confirm("CONFIRMATION REQUISE\n\nRéinitialiser toutes les données de course ?\n\n\u2022 Tours, temps, commentaires : supprimés\n\u2022 Scouts importés : conservés\n\u2022 Configuration event : réinitialisée")) {
       updateState((prev) => ({

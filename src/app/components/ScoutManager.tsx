@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import { UserPlus, Trash2, Upload, FileSpreadsheet, X, Shield, Users, Pencil, Check, Heart } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Scout } from "./types";
@@ -100,7 +100,7 @@ function ScoutRow({ s, editingId, editName, onSetEditName, onStartEdit, onSaveEd
   );
 }
 
-export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts, onUpdateScout }: ScoutManagerProps) {
+export const ScoutManager = memo(function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts, onUpdateScout }: ScoutManagerProps) {
   const [name, setName] = useState("");
   const [troupe, setTroupe] = useState<Scout["troupe"]>("Ungava");
   const [role, setRole] = useState<Scout["role"]>("scout");
@@ -468,4 +468,4 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
       `}</style>
     </div>
   );
-}
+});
