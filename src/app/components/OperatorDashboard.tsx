@@ -116,6 +116,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const [selectedScoutHistory, setSelectedScoutHistory] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
+  // Inline lap-time editor: stores the timestamp of the record being edited + draft value
+  const [editingLapTs, setEditingLapTs] = useState<number | null>(null);
+  const [editingLapDraft, setEditingLapDraft] = useState("");
 
   // Event-setup form
   const [setupName, setSetupName] = useState(DEFAULT_EVENT_CONFIG.eventName);
@@ -600,16 +603,39 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const handleSaveEventConfig = () => {
     updateState((prev) => ({
       ...prev,
+      raceStarted: true,
       eventConfig: {
         eventName: setupName || DEFAULT_EVENT_CONFIG.eventName,
-        startTime: Date.now(),
+        startTime: prev.raceStarted ? prev.eventStartTime : Date.now(),
         durationMs: (parseFloat(setupDuration) || 24) * 3600000,
         circuitLengthKm: parseFloat(setupCircuit) || 2.61,
       },
-      eventStartTime: Date.now(),
+      // Only reset start time on first launch, preserve it on reconfigure
+      eventStartTime: prev.raceStarted ? prev.eventStartTime : Date.now(),
     }));
     setShowEventSetup(false);
-    toast.success("Configuration sauvegardée !");
+    toast.success(state.raceStarted ? "Configuration sauvegardée !" : "Course lancée ! Bonne chance à tous !");
+  };
+
+  const handleUpdateLapTime = (timestamp: number, draft: string) => {
+    // Accept MM:SS or M:SS or raw seconds
+    const parts = draft.trim().split(":");
+    let secs = 0;
+    if (parts.length === 2) {
+      secs = parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+    } else if (parts.length === 1 && draft.trim() !== "") {
+      secs = parseFloat(draft.trim());
+    }
+    if (secs > 0) {
+      updateState((prev) => ({
+        ...prev,
+        lapRecords: prev.lapRecords.map((r) =>
+          r.timestamp === timestamp ? { ...r, lapTime: secs } : r
+        ),
+      }));
+      toast.success("Temps modifié");
+    }
+    setEditingLapTs(null);
   };
 
   const handleLaunchRace = () => {
@@ -683,7 +709,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
       {/* ── Event Setup Dialog ──────────────────────────────── */}
       {showEventSetup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="bg-[#111] border border-[#333] rounded-lg p-6 w-full max-w-md shadow-2xl">
             <h2 className="text-lg font-bold text-white uppercase tracking-widest mb-1">Configuration</h2>
             <p className="text-[10px] text-[#888] uppercase tracking-widest mb-6">Paramétrez avant le départ</p>
@@ -742,7 +768,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       {/* ── Scout History Dialog ────────────────────────────── */}
       {selectedScoutHistory && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={() => setSelectedScoutHistory(null)}
         >
           <div
@@ -815,7 +841,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       {/* ── Chat Moderation Panel (side drawer) ────────────── */}
       {showChatMod && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/60"
+          className="fixed inset-0 z-[2000] flex justify-end bg-black/60"
           onClick={() => setShowChatMod(false)}
         >
           <div
@@ -1364,8 +1390,34 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                           {bikeShortLabel(record.bikeId)}
                         </span>
                       </td>
-                      <td className="py-2 px-4 font-['Roboto_Mono'] text-right text-[#22c55e]">
-                        {formatTimeFull(record.lapTime)}
+                      <td
+                        className="py-2 px-4 text-right"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingLapTs(record.timestamp);
+                          const m = Math.floor(record.lapTime / 60);
+                          const s = Math.floor(record.lapTime % 60);
+                          setEditingLapDraft(`${m}:${String(s).padStart(2, "0")}`);
+                        }}
+                      >
+                        {editingLapTs === record.timestamp ? (
+                          <input
+                            autoFocus
+                            className="w-24 bg-[#222] border border-[#555] rounded px-2 py-0.5 font-['Roboto_Mono'] text-[#22c55e] text-xs text-right outline-none focus:border-[#22c55e]"
+                            value={editingLapDraft}
+                            onChange={(e) => setEditingLapDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateLapTime(record.timestamp, editingLapDraft);
+                              if (e.key === "Escape") setEditingLapTs(null);
+                            }}
+                            onBlur={() => handleUpdateLapTime(record.timestamp, editingLapDraft)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className="font-['Roboto_Mono'] text-[#22c55e] hover:text-white hover:underline cursor-text" title="Cliquer pour modifier">
+                            {formatTimeFull(record.lapTime)}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

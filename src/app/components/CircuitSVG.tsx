@@ -156,7 +156,7 @@ export function CircuitSVG({
   ];
 
   return (
-    <div className="relative w-full" style={{ height: 280 }}>
+    <div className="relative w-full" style={{ height: 280, isolation: "isolate" }}>
       <MapContainer
         center={MAP_CENTER}
         zoom={14.8}

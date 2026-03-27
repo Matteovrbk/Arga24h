@@ -373,7 +373,6 @@ export function BikeQueue({
                   >
                     <Plus className="w-3 h-3" />
                   </button>
-                  <span className="text-[8px] text-[#666] uppercase ml-0.5">t</span>
                 </div>
                 <div className="flex gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
                   <button
