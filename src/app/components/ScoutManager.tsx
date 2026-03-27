@@ -39,6 +39,67 @@ function TroupeBadge({ troupe }: { troupe: string }) {
   );
 }
 
+interface ScoutRowProps {
+  s: Scout;
+  editingId: string | null;
+  editName: string;
+  onSetEditName: (v: string) => void;
+  onStartEdit: (scout: Scout) => void;
+  onSaveEdit: (id: string) => void;
+  onUpdateScout: (id: string, updates: Partial<Pick<Scout, "name" | "troupe" | "role">>) => void;
+  onRemoveScout: (id: string) => void;
+}
+
+function ScoutRow({ s, editingId, editName, onSetEditName, onStartEdit, onSaveEdit, onUpdateScout, onRemoveScout }: ScoutRowProps) {
+  const isEditing = editingId === s.id;
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-[#151515] border border-[#222] rounded group hover:border-[#333]">
+      {isEditing ? (
+        <input
+          type="text"
+          value={editName}
+          onChange={(e) => onSetEditName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSaveEdit(s.id)}
+          autoFocus
+          className="flex-1 px-2 py-0.5 bg-[#0a0a0a] border border-[#444] rounded text-[11px] font-bold text-white uppercase outline-none focus:border-[#666] min-w-0"
+        />
+      ) : (
+        <span className="text-[11px] font-bold text-[#ddd] uppercase truncate flex-1 min-w-0">{s.name}</span>
+      )}
+      <TroupeBadge troupe={s.troupe} />
+      <select
+        value={s.troupe}
+        onChange={(e) => onUpdateScout(s.id, { troupe: e.target.value as Scout["troupe"] })}
+        className="bg-[#0a0a0a] border border-[#333] rounded text-[9px] text-[#aaa] uppercase px-1 py-0.5 outline-none opacity-0 group-hover:opacity-100 transition-opacity w-[70px]"
+      >
+        {TROUPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+      </select>
+      <select
+        value={s.role}
+        onChange={(e) => onUpdateScout(s.id, { role: e.target.value as Scout["role"] })}
+        className="bg-[#0a0a0a] border border-[#333] rounded text-[9px] text-[#aaa] uppercase px-1 py-0.5 outline-none opacity-0 group-hover:opacity-100 transition-opacity w-[65px]"
+      >
+        {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+      </select>
+      {isEditing ? (
+        <button onClick={() => onSaveEdit(s.id)} className="p-1 text-[#22c55e] hover:text-[#16a34a]">
+          <Check className="w-3.5 h-3.5" />
+        </button>
+      ) : (
+        <button onClick={() => onStartEdit(s)} className="p-1 text-[#555] hover:text-[#aaa] opacity-0 group-hover:opacity-100 transition-opacity">
+          <Pencil className="w-3 h-3" />
+        </button>
+      )}
+      <button
+        onClick={() => onRemoveScout(s.id)}
+        className="p-1 text-[#555] hover:text-[#ef4444] transition-colors opacity-0 group-hover:opacity-100"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts, onUpdateScout }: ScoutManagerProps) {
   const [name, setName] = useState("");
   const [troupe, setTroupe] = useState<Scout["troupe"]>("Ungava");
@@ -361,7 +422,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
           </div>
           <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar pr-1">
             {animateurs.map((s) => (
-              <ScoutRow key={s.id} s={s} />
+              <ScoutRow key={s.id} s={s} editingId={editingId} editName={editName} onSetEditName={setEditName} onStartEdit={startEdit} onSaveEdit={saveEdit} onUpdateScout={onUpdateScout} onRemoveScout={onRemoveScout} />
             ))}
             {animateurs.length === 0 && (
               <div className="text-[10px] uppercase tracking-widest font-['Roboto_Mono'] text-[#444] text-center py-4 border border-dashed border-[#222] rounded">
@@ -382,7 +443,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
           </div>
           <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar pr-1">
             {scoutsList.map((s) => (
-              <ScoutRow key={s.id} s={s} />
+              <ScoutRow key={s.id} s={s} editingId={editingId} editName={editName} onSetEditName={setEditName} onStartEdit={startEdit} onSaveEdit={saveEdit} onUpdateScout={onUpdateScout} onRemoveScout={onRemoveScout} />
             ))}
             {scoutsList.length === 0 && (
               <div className="text-[10px] uppercase tracking-widest font-['Roboto_Mono'] text-[#444] text-center py-4 border border-dashed border-[#222] rounded">
