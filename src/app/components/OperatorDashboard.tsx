@@ -1112,49 +1112,22 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
       {/* ── Main content ───────────────────────────────────── */}
       <main className="max-w-[1800px] mx-auto p-4 space-y-4">
-        {/* Race control bar */}
-        <div className="bg-[#111] rounded-md border border-[#222] p-3 flex items-center gap-3 flex-wrap">
-          {!state.raceStarted ? (
-            <>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] text-[#888] uppercase tracking-widest">Course pas encore lancee</div>
-                <div className="text-xs text-[#555] mt-0.5">Configurez l'evenement et lancez le chrono</div>
-              </div>
-              <button
-                onClick={() => setShowEventSetup(true)}
-                className="px-5 py-2.5 bg-[#22c55e] text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-[#16a34a] transition-colors shadow-lg shadow-green-900/30 flex items-center gap-2"
-              >
-                <Settings2 className="w-4 h-4" />
-                Configurer et Lancer
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
-                  <span className="text-[10px] text-[#22c55e] uppercase tracking-widest font-bold">Course en cours</span>
-                </div>
-                <div className="text-[10px] text-[#666] mt-0.5 font-['Roboto_Mono']">
-                  {totalLaps} tours | {totalDistance} km
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEventSetup(true)}
-                className="px-3 py-1.5 bg-[#222] border border-[#333] text-[#aaa] text-[10px] uppercase tracking-widest rounded hover:bg-[#333] transition-colors"
-              >
-                Reconfigurer
-              </button>
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] text-[10px] uppercase tracking-widest rounded text-[#ef4444] hover:text-white transition-colors flex items-center gap-1.5"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                Reinitialiser
-              </button>
-            </>
-          )}
-        </div>
+        {/* Race control bar — visible uniquement avant le lancement */}
+        {!state.raceStarted && (
+          <div className="bg-[#111] rounded-md border border-[#222] p-3 flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-[#888] uppercase tracking-widest">Course pas encore lancee</div>
+              <div className="text-xs text-[#555] mt-0.5">Configurez l'evenement et lancez le chrono</div>
+            </div>
+            <button
+              onClick={() => setShowEventSetup(true)}
+              className="px-5 py-2.5 bg-[#22c55e] text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-[#16a34a] transition-colors shadow-lg shadow-green-900/30 flex items-center gap-2"
+            >
+              <Settings2 className="w-4 h-4" />
+              Configurer et Lancer
+            </button>
+          </div>
+        )}
 
         {/* Scout manager panel */}
         {showScoutManager && (
