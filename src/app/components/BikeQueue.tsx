@@ -11,7 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import type { Scout, BikeState, LapRecord } from "./types";
-import { bikeName, bikeShortLabel, formatTimeShort } from "./types";
+import { bikeName, bikeShortLabel, formatTimeShort, troupeColor } from "./types";
 
 interface BikeQueueProps {
   bikeId: 1 | 2 | 3;
@@ -46,6 +46,7 @@ export function BikeQueue({
 }: BikeQueueProps) {
   const [searchText, setSearchText] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [troupeFilter, setTroupeFilter] = useState<"all" | "Ungava" | "Argapura" | "CuPiDon">("all");
   const searchRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -55,10 +56,11 @@ export function BikeQueue({
     .filter(Boolean) as Scout[];
 
   // All scouts available (allow duplicates — same person can be queued multiple times)
-  const filteredScouts = scouts.filter((s) =>
-    s.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    s.troupe.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredScouts = scouts.filter((s) => {
+    if (troupeFilter !== "all" && s.troupe !== troupeFilter) return false;
+    if (searchText && !s.name.toLowerCase().includes(searchText.toLowerCase())) return false;
+    return true;
+  });
 
   const elapsedTime =
     bikeState.lapStartTime !== null ? currentTime - bikeState.lapStartTime : 0;
@@ -121,7 +123,7 @@ export function BikeQueue({
           className="w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold font-['Roboto_Mono'] text-black"
           style={{ backgroundColor: color }}
         >
-          {bikeId === 3 ? "\u03C0" : bikeId}
+          {bikeId === 3 ? "Pi" : bikeId}
         </div>
         <h2 className="text-white text-xs font-bold uppercase tracking-widest m-0">
           {label}
@@ -263,11 +265,34 @@ export function BikeQueue({
             </div>
           </div>
 
+          {/* Troupe filter buttons */}
+          <div className="flex gap-1 mt-1.5">
+            {([
+              { key: "all" as const, label: "TOUS", clr: "#888" },
+              { key: "Ungava" as const, label: "UNG", clr: troupeColor("Ungava") },
+              { key: "Argapura" as const, label: "ARG", clr: troupeColor("Argapura") },
+              { key: "CuPiDon" as const, label: "CUP", clr: troupeColor("CuPiDon") },
+            ]).map((f) => (
+              <button
+                key={f.key}
+                onMouseDown={(e) => { e.preventDefault(); setTroupeFilter(f.key); setShowDropdown(true); }}
+                className="px-1.5 py-0.5 text-[8px] uppercase tracking-widest font-bold rounded border transition-all"
+                style={
+                  troupeFilter === f.key
+                    ? { backgroundColor: f.clr, borderColor: f.clr, color: "#000" }
+                    : { backgroundColor: "transparent", borderColor: "#333", color: "#555" }
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Dropdown list */}
-          {showDropdown && (searchText.length > 0 || document.activeElement === searchRef.current) && (
+          {showDropdown && (searchText.length > 0 || troupeFilter !== "all" || document.activeElement === searchRef.current) && (
             <div
               ref={dropdownRef}
-              className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#1a1a1a] border border-[#333] rounded shadow-xl max-h-[200px] overflow-y-auto custom-scrollbar"
+              className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#1a1a1a] border border-[#333] rounded shadow-xl max-h-[320px] overflow-y-auto custom-scrollbar"
             >
               {filteredScouts.length === 0 ? (
                 <div className="px-3 py-2 text-[10px] text-[#555] uppercase tracking-widest">
@@ -281,18 +306,18 @@ export function BikeQueue({
                       e.preventDefault();
                       handleSelectScout(s.id);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#2a2a2a] transition-colors text-left"
+                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#2a2a2a] transition-colors text-left border-b border-[#222] last:border-0"
                   >
-                    <div>
-                      <div className="text-xs font-bold text-[#eee] uppercase">{s.name}</div>
-                      <div
-                        className="text-[9px] uppercase tracking-widest"
-                        style={{ color: s.troupe === "Ungava" ? "#3b82f6" : "#ef4444" }}
-                      >
-                        {s.troupe}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-1 h-4 rounded-sm flex-shrink-0" style={{ backgroundColor: troupeColor(s.troupe) }} />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[#eee] uppercase truncate">{s.name}</div>
+                        <div className="text-[9px] uppercase tracking-widest" style={{ color: troupeColor(s.troupe) }}>
+                          {s.troupe} {s.role === "animateur" ? "- ANIM" : ""}
+                        </div>
                       </div>
                     </div>
-                    <Plus className="w-3.5 h-3.5 text-[#555]" style={{ color }} />
+                    <Plus className="w-3.5 h-3.5 text-[#555] flex-shrink-0" style={{ color }} />
                   </button>
                 ))
               )}
@@ -319,9 +344,7 @@ export function BikeQueue({
                   <div className="flex items-center gap-2">
                     <span
                       className="text-[9px] uppercase tracking-widest"
-                      style={{
-                        color: scout.troupe === "Ungava" ? "#3b82f6" : "#ef4444",
-                      }}
+                      style={{ color: troupeColor(scout.troupe) }}
                     >
                       {scout.troupe}
                     </span>

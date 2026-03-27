@@ -14,7 +14,7 @@ const FILTERS: { key: FilterMode; label: string; color: string }[] = [
   { key: "all",      label: "Tous",       color: "#888"       },
   { key: "bike1",    label: "V\u00e9lo 1", color: BIKE1_COLOR  },
   { key: "bike2",    label: "V\u00e9lo 2", color: BIKE2_COLOR  },
-  { key: "bike3",    label: "V\u00e9lo \u03C0", color: BIKE3_COLOR  },
+  { key: "bike3",    label: "V\u00e9lo Pi", color: BIKE3_COLOR  },
   { key: "Ungava",   label: "Ungava",     color: "#3b82f6"    },
   { key: "Argapura", label: "Argapura",   color: "#ef4444"    },
 ];

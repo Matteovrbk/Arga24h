@@ -114,7 +114,7 @@ export function SpectatorView() {
     { key: "all" as const,      label: "TOUS",       color: "#888"      },
     { key: "bike1" as const,    label: "V1",         color: BIKE1_COLOR },
     { key: "bike2" as const,    label: "V2",         color: BIKE2_COLOR },
-    { key: "bike3" as const,    label: "V\u03C0",    color: BIKE3_COLOR },
+    { key: "bike3" as const,    label: "VPi",        color: BIKE3_COLOR },
     { key: "Ungava" as const,   label: "UNGAVA",     color: "#3b82f6"   },
     { key: "Argapura" as const, label: "ARGAPURA",   color: "#ef4444"   },
   ];
@@ -162,6 +162,13 @@ export function SpectatorView() {
           >
             <ArrowLeft className="w-3 h-3" />
             Admin
+          </button>
+          <div className="w-px h-4 bg-[#333]" />
+          <button
+            onClick={() => navigate("/attente")}
+            className="text-[#666] hover:text-[#fff] transition-colors text-[10px] uppercase tracking-widest"
+          >
+            File d'attente
           </button>
           <div className="w-px h-4 bg-[#333]" />
           <div className="flex items-center gap-2">
@@ -317,10 +324,10 @@ export function SpectatorView() {
             <div className="flex justify-between items-start mb-1">
               <div className="flex items-center gap-2">
                 <div className="bg-[#dc2626] text-black w-5 h-5 flex items-center justify-center font-bold font-['Roboto_Mono'] text-[10px]">
-                  {"\u03C0"}
+                  Pi
                 </div>
                 <span className="text-xs font-bold text-[#ccc] tracking-widest uppercase">
-                  Vélo {"\u03C0"}
+                  Vélo Pi
                 </span>
                 <span className="text-[8px] text-[#666] uppercase tracking-widest">CuPiDon</span>
               </div>

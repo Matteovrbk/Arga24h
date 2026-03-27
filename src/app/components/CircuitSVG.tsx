@@ -275,7 +275,7 @@ export function CircuitSVG({
             }}
           >
             <Tooltip permanent direction="left" offset={[-12, 0]} className="circuit-tooltip bike-tooltip">
-              V{"\u03C0"}{bike3Rider ? ` — ${bike3Rider}` : ""}
+              VPi{bike3Rider ? ` — ${bike3Rider}` : ""}
             </Tooltip>
           </CircleMarker>
         )}

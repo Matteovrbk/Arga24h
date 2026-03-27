@@ -1,8 +1,15 @@
 export interface Scout {
   id: string;
   name: string;
-  troupe: "Ungava" | "Argapura";
+  troupe: "Ungava" | "Argapura" | "CuPiDon";
   role: "scout" | "animateur";
+}
+
+export function troupeColor(troupe: string): string {
+  if (troupe === "Ungava") return "#3b82f6";
+  if (troupe === "Argapura") return "#ef4444";
+  if (troupe === "CuPiDon") return "#a855f7";
+  return "#888";
 }
 
 export interface LapRecord {
@@ -83,12 +90,12 @@ export const LAP_VALIDATION_THRESHOLDS = {
 };
 
 export function bikeName(bikeId: 1 | 2 | 3): string {
-  if (bikeId === 3) return "Vélo \u03C0";
+  if (bikeId === 3) return "Vélo Pi";
   return `Vélo ${bikeId}`;
 }
 
 export function bikeShortLabel(bikeId: 1 | 2 | 3): string {
-  if (bikeId === 3) return "V\u03C0";
+  if (bikeId === 3) return "VPi";
   return `V${bikeId}`;
 }
 

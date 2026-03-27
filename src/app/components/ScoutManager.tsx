@@ -1,21 +1,54 @@
 import { useState, useCallback } from "react";
-import { UserPlus, Trash2, Upload, FileSpreadsheet, X, Shield, Users } from "lucide-react";
+import { UserPlus, Trash2, Upload, FileSpreadsheet, X, Shield, Users, Pencil, Check, Heart } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Scout } from "./types";
+import { troupeColor } from "./types";
 
 interface ScoutManagerProps {
   scouts: Scout[];
   onAddScout: (scout: Scout) => void;
   onRemoveScout: (id: string) => void;
   onImportScouts: (scouts: Scout[]) => void;
+  onUpdateScout: (id: string, updates: Partial<Pick<Scout, "name" | "troupe" | "role">>) => void;
 }
 
-export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts }: ScoutManagerProps) {
+const TROUPE_OPTIONS: { value: Scout["troupe"]; label: string }[] = [
+  { value: "Ungava", label: "UNGAVA" },
+  { value: "Argapura", label: "ARGAPURA" },
+  { value: "CuPiDon", label: "CUPIDON" },
+];
+
+const ROLE_OPTIONS: { value: Scout["role"]; label: string }[] = [
+  { value: "scout", label: "SCOUT" },
+  { value: "animateur", label: "ANIMATEUR" },
+];
+
+function TroupeBadge({ troupe }: { troupe: string }) {
+  const color = troupeColor(troupe);
+  return (
+    <span
+      className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded font-bold font-['Roboto_Mono'] shrink-0"
+      style={{
+        color,
+        backgroundColor: color + "18",
+        border: `1px solid ${color}33`,
+      }}
+    >
+      {troupe === "CuPiDon" ? "CUP" : troupe.substring(0, 3)}
+    </span>
+  );
+}
+
+export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts, onUpdateScout }: ScoutManagerProps) {
   const [name, setName] = useState("");
-  const [troupe, setTroupe] = useState<"Ungava" | "Argapura">("Ungava");
-  const [role, setRole] = useState<"scout" | "animateur">("scout");
+  const [troupe, setTroupe] = useState<Scout["troupe"]>("Ungava");
+  const [role, setRole] = useState<Scout["role"]>("scout");
   const [isDragging, setIsDragging] = useState(false);
   const [importPreview, setImportPreview] = useState<Scout[] | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [filterTroupe, setFilterTroupe] = useState<"all" | Scout["troupe"]>("all");
+  const [searchFilter, setSearchFilter] = useState("");
 
   const handleAdd = () => {
     if (!name.trim()) return;
@@ -32,8 +65,26 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
     if (e.key === "Enter") handleAdd();
   };
 
-  const animateurs = scouts.filter((s) => s.role === "animateur");
-  const scoutsList = scouts.filter((s) => s.role === "scout");
+  const startEdit = (scout: Scout) => {
+    setEditingId(scout.id);
+    setEditName(scout.name);
+  };
+
+  const saveEdit = (id: string) => {
+    if (editName.trim()) {
+      onUpdateScout(id, { name: editName.trim() });
+    }
+    setEditingId(null);
+  };
+
+  const filteredScouts = scouts.filter((s) => {
+    if (filterTroupe !== "all" && s.troupe !== filterTroupe) return false;
+    if (searchFilter && !s.name.toLowerCase().includes(searchFilter.toLowerCase())) return false;
+    return true;
+  });
+
+  const animateurs = filteredScouts.filter((s) => s.role === "animateur");
+  const scoutsList = filteredScouts.filter((s) => s.role === "scout");
 
   const parseExcelFile = useCallback((file: File) => {
     const reader = new FileReader();
@@ -55,9 +106,10 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
             const rawTroupe = (row["Troupe"] || row["troupe"] || row["TROUPE"] || row["Groupe"] || row["groupe"] || "").trim().toLowerCase();
             const rawRole = (row["Role"] || row["role"] || row["Rôle"] || row["rôle"] || row["ROLE"] || row["Type"] || row["type"] || "").trim().toLowerCase();
 
-            const troupe: "Ungava" | "Argapura" =
+            const troupe: Scout["troupe"] =
+              rawTroupe.includes("cupi") || rawTroupe.includes("pion") ? "CuPiDon" :
               rawTroupe.includes("arga") ? "Argapura" : "Ungava";
-            const role: "scout" | "animateur" =
+            const role: Scout["role"] =
               rawRole.includes("anim") ? "animateur" : "scout";
 
             return { id: crypto.randomUUID(), name: nom, troupe, role };
@@ -101,31 +153,60 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
     }
   };
 
-  const ScoutRow = ({ s }: { s: Scout }) => (
-    <div
-      className="flex items-center justify-between px-2 py-1.5 bg-[#151515] border border-[#222] rounded group hover:border-[#333]"
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="text-[11px] font-bold text-[#ddd] uppercase truncate">{s.name}</span>
-        <span
-          className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded font-bold font-['Roboto_Mono'] shrink-0"
-          style={{
-            color: s.troupe === "Ungava" ? "#3b82f6" : "#ef4444",
-            backgroundColor: s.troupe === "Ungava" ? "rgba(59,130,246,0.1)" : "rgba(239,68,68,0.1)",
-            border: `1px solid ${s.troupe === "Ungava" ? "rgba(59,130,246,0.2)" : "rgba(239,68,68,0.2)"}`,
-          }}
+  const ScoutRow = ({ s }: { s: Scout }) => {
+    const isEditing = editingId === s.id;
+
+    return (
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-[#151515] border border-[#222] rounded group hover:border-[#333]">
+        {isEditing ? (
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveEdit(s.id)}
+            autoFocus
+            className="flex-1 px-2 py-0.5 bg-[#0a0a0a] border border-[#444] rounded text-[11px] font-bold text-white uppercase outline-none focus:border-[#666] min-w-0"
+          />
+        ) : (
+          <span className="text-[11px] font-bold text-[#ddd] uppercase truncate flex-1 min-w-0">{s.name}</span>
+        )}
+        <TroupeBadge troupe={s.troupe} />
+        {/* Troupe select */}
+        <select
+          value={s.troupe}
+          onChange={(e) => onUpdateScout(s.id, { troupe: e.target.value as Scout["troupe"] })}
+          className="bg-[#0a0a0a] border border-[#333] rounded text-[9px] text-[#aaa] uppercase px-1 py-0.5 outline-none opacity-0 group-hover:opacity-100 transition-opacity w-[70px]"
         >
-          {s.troupe.substring(0, 3)}
-        </span>
+          {TROUPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        {/* Role select */}
+        <select
+          value={s.role}
+          onChange={(e) => onUpdateScout(s.id, { role: e.target.value as Scout["role"] })}
+          className="bg-[#0a0a0a] border border-[#333] rounded text-[9px] text-[#aaa] uppercase px-1 py-0.5 outline-none opacity-0 group-hover:opacity-100 transition-opacity w-[65px]"
+        >
+          {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        {/* Edit/Save name */}
+        {isEditing ? (
+          <button onClick={() => saveEdit(s.id)} className="p-1 text-[#22c55e] hover:text-[#16a34a]">
+            <Check className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <button onClick={() => startEdit(s)} className="p-1 text-[#555] hover:text-[#aaa] opacity-0 group-hover:opacity-100 transition-opacity">
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
+        {/* Delete */}
+        <button
+          onClick={() => onRemoveScout(s.id)}
+          className="p-1 text-[#555] hover:text-[#ef4444] transition-colors opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
-      <button
-        onClick={() => onRemoveScout(s.id)}
-        className="text-[#555] hover:text-[#ef4444] transition-colors opacity-0 group-hover:opacity-100"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="bg-[#111] border border-[#222] rounded-md p-4 space-y-4 font-['Inter'] shadow-lg">
@@ -136,7 +217,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-[#22c55e]" />
               <span className="text-xs font-bold uppercase tracking-widest text-[#22c55e]">
-                Aperçu Import — {importPreview.length} personnes
+                Apercu Import — {importPreview.length} personnes
               </span>
             </div>
             <button onClick={() => setImportPreview(null)} className="text-[#555] hover:text-white">
@@ -148,12 +229,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
             {importPreview.map((s, i) => (
               <div key={i} className="flex items-center gap-2 px-2 py-1 bg-[#151515] border border-[#222] rounded text-[11px]">
                 <span className="font-bold text-[#ddd] uppercase flex-1 truncate">{s.name}</span>
-                <span
-                  className="text-[9px] uppercase px-1.5 py-0.5 rounded font-['Roboto_Mono']"
-                  style={{ color: s.troupe === "Ungava" ? "#3b82f6" : "#ef4444" }}
-                >
-                  {s.troupe.substring(0, 3)}
-                </span>
+                <TroupeBadge troupe={s.troupe} />
                 <span
                   className="text-[9px] uppercase px-1.5 py-0.5 rounded font-['Roboto_Mono']"
                   style={{ color: s.role === "animateur" ? "#eab308" : "#888" }}
@@ -205,7 +281,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
           Glisser un fichier Excel ici ou cliquer pour importer
         </div>
         <div className="text-[9px] text-[#444] uppercase tracking-wider mt-1 font-['Roboto_Mono']">
-          Colonnes : Nom, Troupe (Ungava/Argapura), Rôle (Scout/Animateur)
+          Colonnes : Nom, Troupe (Ungava/Argapura/CuPiDon), Role (Scout/Animateur)
         </div>
       </div>
 
@@ -221,19 +297,17 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
         />
         <select
           value={troupe}
-          onChange={(e) => setTroupe(e.target.value as "Ungava" | "Argapura")}
+          onChange={(e) => setTroupe(e.target.value as Scout["troupe"])}
           className="px-3 py-2 rounded bg-[#151515] border border-[#333] text-xs font-bold text-[#eee] uppercase outline-none focus:border-[#666]"
         >
-          <option value="Ungava">UNGAVA</option>
-          <option value="Argapura">ARGAPURA</option>
+          {TROUPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as "scout" | "animateur")}
+          onChange={(e) => setRole(e.target.value as Scout["role"])}
           className="px-3 py-2 rounded bg-[#151515] border border-[#333] text-xs font-bold text-[#eee] uppercase outline-none focus:border-[#666]"
         >
-          <option value="scout">SCOUT</option>
-          <option value="animateur">ANIMATEUR</option>
+          {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
         <button
           onClick={handleAdd}
@@ -244,8 +318,38 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
         </button>
       </div>
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 pt-2 border-t border-[#222]">
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          placeholder="Filtrer par nom..."
+          className="flex-1 px-3 py-1.5 rounded bg-[#0a0a0a] border border-[#222] text-[11px] text-[#ddd] outline-none focus:border-[#444] placeholder:text-[#555]"
+        />
+        <div className="flex gap-1">
+          {[{ key: "all" as const, label: "TOUS", color: "#888" }, ...TROUPE_OPTIONS.map(t => ({ key: t.value, label: t.label.substring(0, 3), color: troupeColor(t.value) }))].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilterTroupe(f.key as typeof filterTroupe)}
+              className="px-2 py-1 text-[9px] uppercase tracking-widest font-bold rounded border transition-all"
+              style={
+                filterTroupe === f.key
+                  ? { backgroundColor: f.color, borderColor: f.color, color: "#000" }
+                  : { backgroundColor: "transparent", borderColor: "#333", color: "#666" }
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[10px] text-[#555] font-['Roboto_Mono'] shrink-0">
+          {filteredScouts.length}/{scouts.length}
+        </span>
+      </div>
+
       {/* Lists: Animateurs + Scouts */}
-      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#222]">
+      <div className="grid grid-cols-2 gap-4">
         {/* Animateurs */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -255,7 +359,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
             </div>
             <span className="text-[10px] text-[#555] font-['Roboto_Mono']">{animateurs.length} TOTAL</span>
           </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+          <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar pr-1">
             {animateurs.map((s) => (
               <ScoutRow key={s.id} s={s} />
             ))}
@@ -276,7 +380,7 @@ export function ScoutManager({ scouts, onAddScout, onRemoveScout, onImportScouts
             </div>
             <span className="text-[10px] text-[#555] font-['Roboto_Mono']">{scoutsList.length} TOTAL</span>
           </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+          <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar pr-1">
             {scoutsList.map((s) => (
               <ScoutRow key={s.id} s={s} />
             ))}

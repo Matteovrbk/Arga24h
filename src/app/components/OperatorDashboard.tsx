@@ -467,18 +467,38 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     toast.success(`${newScouts.length} personnes importées`);
   };
   const handleRemoveScout = (id: string) => {
-    if (
-      state.bike1.currentRiderId === id ||
-      state.bike2.currentRiderId === id ||
-      state.bike3.currentRiderId === id ||
-      state.bike1.queue.includes(id) ||
-      state.bike2.queue.includes(id) ||
-      state.bike3.queue.includes(id)
-    ) {
-      toast.error("Impossible de supprimer un scout en course ou en file !");
+    const isRiding = state.bike1.currentRiderId === id || state.bike2.currentRiderId === id || state.bike3.currentRiderId === id;
+    const isInQueue = state.bike1.queue.includes(id) || state.bike2.queue.includes(id) || state.bike3.queue.includes(id);
+    if (isRiding) {
+      toast.error("Ce scout est en train de rouler ! Passez le relais d'abord.");
       return;
     }
-    updateState((prev) => ({ ...prev, scouts: prev.scouts.filter((s) => s.id !== id) }));
+    if (isInQueue) {
+      if (!window.confirm("Ce scout est dans une file d'attente. Le retirer de la file ET le supprimer ?")) return;
+    }
+    updateState((prev) => {
+      const removeFromBike = (bike: typeof prev.bike1) => {
+        const indices = bike.queue.reduce<number[]>((acc, qId, i) => qId === id ? [...acc, i] : acc, []);
+        if (indices.length === 0) return bike;
+        const queue = bike.queue.filter((_, i) => !indices.includes(i));
+        const laps = bike.queuePlannedLaps.filter((_, i) => !indices.includes(i));
+        return { ...bike, queue, queuePlannedLaps: laps };
+      };
+      return {
+        ...prev,
+        scouts: prev.scouts.filter((s) => s.id !== id),
+        bike1: removeFromBike(prev.bike1),
+        bike2: removeFromBike(prev.bike2),
+        bike3: removeFromBike(prev.bike3),
+      };
+    });
+    toast.success("Scout supprime");
+  };
+  const handleUpdateScout = (id: string, updates: Partial<Pick<Scout, "name" | "troupe" | "role">>) => {
+    updateState((prev) => ({
+      ...prev,
+      scouts: prev.scouts.map((s) => s.id === id ? { ...s, ...updates } : s),
+    }));
   };
   const handleReset = () => {
     if (window.confirm("CONFIRMATION REQUISE\n\nRéinitialiser toutes les données de course ?\n\n\u2022 Tours, temps, commentaires : supprimés\n\u2022 Scouts importés : conservés\n\u2022 Configuration event : réinitialisée")) {
@@ -792,24 +812,42 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
-      {/* ── Chat Moderation Dialog ────────────────────────── */}
+      {/* ── Chat Moderation Panel (side drawer) ────────────── */}
       {showChatMod && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex justify-end bg-black/60"
           onClick={() => setShowChatMod(false)}
         >
           <div
-            className="bg-[#111] border border-[#333] rounded-lg p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+            className="bg-[#111] border-l border-[#333] w-full max-w-md shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-bold text-white uppercase tracking-widest">Modération Chat</h2>
-                <p className="text-[10px] text-[#888] uppercase tracking-widest mt-1">
-                  {chatMessages.length} messages
-                </p>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[#222] bg-[#151515] flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#e11d48] p-1.5 rounded">
+                    <MessageSquare className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white uppercase tracking-widest">Modération Chat</h2>
+                    <p className="text-[10px] text-[#888] uppercase tracking-widest mt-0.5">
+                      {chatMessages.length} message{chatMessages.length !== 1 ? "s" : ""} en direct
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowChatMod(false)} className="text-[#666] hover:text-white p-1">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <div className="flex items-center gap-2">
+            </div>
+
+            {/* Actions bar */}
+            <div className="px-5 py-2 border-b border-[#222] bg-[#0d0d0d] flex items-center justify-between flex-shrink-0">
+              <span className="text-[9px] text-[#666] uppercase tracking-widest font-['Roboto_Mono']">
+                Survolez un message pour le supprimer
+              </span>
+              {chatMessages.length > 0 && (
                 <button
                   onClick={() => {
                     if (window.confirm("Supprimer TOUS les messages du chat ?")) {
@@ -817,47 +855,66 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                       toast.success("Chat vidé");
                     }
                   }}
-                  className="px-2 py-1 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] rounded text-[10px] uppercase tracking-widest text-white transition-colors"
+                  className="px-2.5 py-1 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] rounded text-[9px] uppercase tracking-widest text-[#ef4444] hover:text-white transition-colors flex items-center gap-1.5"
                 >
-                  Tout supprimer
+                  <Trash2 className="w-3 h-3" />
+                  Tout vider
                 </button>
-                <button onClick={() => setShowChatMod(false)} className="text-[#666] hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              )}
             </div>
-            <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
-              {chatMessages.length === 0 && (
-                <div className="text-center text-[#555] py-8 text-[10px] uppercase tracking-widest">
-                  Aucun message
+
+            {/* Messages list */}
+            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+              {chatMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-[#555]">
+                  <MessageSquare className="w-8 h-8 opacity-30" />
+                  <span className="text-[10px] uppercase tracking-widest">Aucun message</span>
+                </div>
+              ) : (
+                <div className="divide-y divide-[#1a1a1a]">
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className="flex items-start gap-3 px-5 py-3 group hover:bg-[#0a0a0a] transition-colors relative"
+                    >
+                      {/* Avatar */}
+                      <div className="w-7 h-7 rounded-full bg-[#222] border border-[#333] flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-[9px] font-bold text-[#888] uppercase">
+                          {msg.author.substring(0, 2)}
+                        </span>
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[11px] font-bold text-[#e2a03f]">{msg.author}</span>
+                          <span className="text-[8px] text-[#555] font-['Roboto_Mono']">
+                            {new Date(msg.timestamp).toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-[#ccc] break-words leading-relaxed">{msg.text}</div>
+                      </div>
+                      {/* Delete button */}
+                      <button
+                        onClick={() => {
+                          deleteMessage(msg.id);
+                          toast.success("Message supprimé");
+                        }}
+                        className="p-1.5 rounded bg-transparent hover:bg-red-900/40 text-[#444] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-              {chatMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className="flex items-start gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#222] rounded group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[10px] font-bold text-[#e2a03f]">{msg.author}</span>
-                      <span className="text-[8px] text-[#444] font-['Roboto_Mono']">
-                        {new Date(msg.timestamp).toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-[#ccc] mt-0.5 break-words">{msg.text}</div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      deleteMessage(msg.id);
-                      toast.success("Message supprimé");
-                    }}
-                    className="p-1 text-[#555] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                    title="Supprimer ce message"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-[#222] bg-[#0d0d0d] flex-shrink-0">
+              <div className="text-[9px] text-[#555] uppercase tracking-widest font-['Roboto_Mono'] text-center">
+                Les messages supprimés disparaissent pour tous les spectateurs
+              </div>
             </div>
           </div>
         </div>
@@ -1014,7 +1071,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           <kbd className="text-[#888] bg-[#222] px-1 rounded">2</kbd> Tour V2
         </span>
         <span>
-          <kbd className="text-[#888] bg-[#222] px-1 rounded">3</kbd> Tour V{"\u03C0"}
+          <kbd className="text-[#888] bg-[#222] px-1 rounded">3</kbd> Tour VPi
         </span>
         <span>
           <kbd className="text-[#888] bg-[#222] px-1 rounded">N</kbd> Relais V1
@@ -1023,12 +1080,56 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           <kbd className="text-[#888] bg-[#222] px-1 rounded">M</kbd> Relais V2
         </span>
         <span>
-          <kbd className="text-[#888] bg-[#222] px-1 rounded">,</kbd> Relais V{"\u03C0"}
+          <kbd className="text-[#888] bg-[#222] px-1 rounded">,</kbd> Relais VPi
         </span>
       </div>
 
       {/* ── Main content ───────────────────────────────────── */}
       <main className="max-w-[1800px] mx-auto p-4 space-y-4">
+        {/* Race control bar */}
+        <div className="bg-[#111] rounded-md border border-[#222] p-3 flex items-center gap-3 flex-wrap">
+          {!state.raceStarted ? (
+            <>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-[#888] uppercase tracking-widest">Course pas encore lancee</div>
+                <div className="text-xs text-[#555] mt-0.5">Configurez l'evenement et lancez le chrono</div>
+              </div>
+              <button
+                onClick={() => setShowEventSetup(true)}
+                className="px-5 py-2.5 bg-[#22c55e] text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-[#16a34a] transition-colors shadow-lg shadow-green-900/30 flex items-center gap-2"
+              >
+                <Settings2 className="w-4 h-4" />
+                Configurer et Lancer
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+                  <span className="text-[10px] text-[#22c55e] uppercase tracking-widest font-bold">Course en cours</span>
+                </div>
+                <div className="text-[10px] text-[#666] mt-0.5 font-['Roboto_Mono']">
+                  {totalLaps} tours | {totalDistance} km
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEventSetup(true)}
+                className="px-3 py-1.5 bg-[#222] border border-[#333] text-[#aaa] text-[10px] uppercase tracking-widest rounded hover:bg-[#333] transition-colors"
+              >
+                Reconfigurer
+              </button>
+              <button
+                onClick={handleReset}
+                className="px-3 py-1.5 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] text-[10px] uppercase tracking-widest rounded text-[#ef4444] hover:text-white transition-colors flex items-center gap-1.5"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Reinitialiser
+              </button>
+            </>
+          )}
+        </div>
+
         {/* Scout manager panel */}
         {showScoutManager && (
           <div className="mb-6 p-4 bg-[#111] border border-[#222] rounded-md shadow-xl">
@@ -1038,6 +1139,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               onAddScout={handleAddScout}
               onRemoveScout={handleRemoveScout}
               onImportScouts={handleImportScouts}
+              onUpdateScout={handleUpdateScout}
             />
           </div>
         )}
@@ -1082,8 +1184,8 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         {/* Map + Leaderboard */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Map */}
-          <div className="hidden md:flex bg-[#111] rounded-md border border-[#222] overflow-hidden flex-col">
-            <div className="px-4 py-2 border-b border-[#222] flex items-center justify-between bg-[#151515]">
+          <div className="hidden md:flex bg-[#111] rounded-md border border-[#222] overflow-hidden flex-col max-h-[380px]">
+            <div className="px-4 py-2 border-b border-[#222] flex items-center justify-between bg-[#151515] flex-shrink-0">
               <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold">Télémétrie Piste</h2>
               <div className="flex gap-4">
                 <div className="flex items-center gap-2">
@@ -1096,7 +1198,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BIKE3_COLOR, opacity: rider3 ? 1 : 0.3 }} />
-                  <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V{"\u03C0"}</span>
+                  <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">VPi</span>
                 </div>
               </div>
             </div>
@@ -1172,7 +1274,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                     />
                     <Line type="monotone" dataKey="bike1" stroke={BIKE1_COLOR} strokeWidth={2} dot={false} name="Vélo 1" />
                     <Line type="monotone" dataKey="bike2" stroke={BIKE2_COLOR} strokeWidth={2} dot={false} name="Vélo 2" />
-                    <Line type="monotone" dataKey="bike3" stroke={BIKE3_COLOR} strokeWidth={2} dot={false} name={`Vélo \u03C0`} />
+                    <Line type="monotone" dataKey="bike3" stroke={BIKE3_COLOR} strokeWidth={2} dot={false} name={"Vélo Pi"} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -1250,7 +1352,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                       </td>
                       <td className="py-2 px-4 font-bold text-[#ddd]">{record.scoutName}</td>
                       <td className="py-2 px-4">
-                        <span className={record.troupe === "Ungava" ? "text-[#3b82f6]" : "text-[#ef4444]"}>
+                        <span style={{ color: record.troupe === "Ungava" ? "#3b82f6" : record.troupe === "CuPiDon" ? "#a855f7" : "#ef4444" }}>
                           {record.troupe}
                         </span>
                       </td>
