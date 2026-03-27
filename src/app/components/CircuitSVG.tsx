@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -123,24 +123,31 @@ function MapConfig() {
 interface CircuitSVGProps {
   bike1Progress: number;
   bike2Progress: number;
+  bike3Progress: number;
   bike1Active: boolean;
   bike2Active: boolean;
+  bike3Active: boolean;
   bike1Rider?: string;
   bike2Rider?: string;
+  bike3Rider?: string;
   dark?: boolean;
 }
 
 export function CircuitSVG({
   bike1Progress,
   bike2Progress,
+  bike3Progress,
   bike1Active,
   bike2Active,
+  bike3Active,
   bike1Rider,
   bike2Rider,
+  bike3Rider,
   dark = false,
 }: CircuitSVGProps) {
   const pos1 = useMemo(() => getPositionOnCircuit(bike1Progress), [bike1Progress]);
   const pos2 = useMemo(() => getPositionOnCircuit(bike2Progress), [bike2Progress]);
+  const pos3 = useMemo(() => getPositionOnCircuit(bike3Progress), [bike3Progress]);
 
   // Ligne départ/arrivée (petit segment perpendiculaire)
   const startFinish: LatLngExpression[] = [
@@ -255,6 +262,24 @@ export function CircuitSVG({
           </CircleMarker>
         )}
 
+        {/* Vélo Pi (CuPiDon) */}
+        {bike3Active && (
+          <CircleMarker
+            center={pos3}
+            radius={10}
+            pathOptions={{
+              fillColor: "#dc2626",
+              color: "#fff",
+              weight: 3,
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip permanent direction="left" offset={[-12, 0]} className="circuit-tooltip bike-tooltip">
+              V{"\u03C0"}{bike3Rider ? ` — ${bike3Rider}` : ""}
+            </Tooltip>
+          </CircleMarker>
+        )}
+
         {/* Vélos inactifs au départ */}
         {!bike1Active && (
           <CircleMarker
@@ -268,6 +293,13 @@ export function CircuitSVG({
             center={[50.80611, 4.38312]}
             radius={5}
             pathOptions={{ fillColor: "#ea580c", color: "#333", weight: 1, fillOpacity: 0.3 }}
+          />
+        )}
+        {!bike3Active && (
+          <CircleMarker
+            center={[50.80598, 4.38290]}
+            radius={5}
+            pathOptions={{ fillColor: "#dc2626", color: "#333", weight: 1, fillOpacity: 0.3 }}
           />
         )}
       </MapContainer>

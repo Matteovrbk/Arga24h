@@ -9,11 +9,21 @@ const STORAGE_KEY = "sp51_state";
 const CHANNEL_NAME = "sp51_sync";
 const FIREBASE_PATH = "sp51/state";
 
+function mergeBike(parsed?: Partial<import("./types").BikeState>): import("./types").BikeState {
+  return {
+    ...INITIAL_BIKE_STATE,
+    ...parsed,
+    queue: Array.isArray(parsed?.queue) ? parsed.queue : [],
+    queuePlannedLaps: Array.isArray(parsed?.queuePlannedLaps) ? parsed.queuePlannedLaps : [],
+  };
+}
+
 function mergeWithDefaults(parsed: Partial<AppState>): AppState {
   return {
     scouts: Array.isArray(parsed.scouts) ? parsed.scouts : [...INITIAL_SCOUTS],
-    bike1: { ...INITIAL_BIKE_STATE, ...parsed.bike1, queue: Array.isArray(parsed.bike1?.queue) ? parsed.bike1.queue : [] },
-    bike2: { ...INITIAL_BIKE_STATE, ...parsed.bike2, queue: Array.isArray(parsed.bike2?.queue) ? parsed.bike2.queue : [] },
+    bike1: mergeBike(parsed.bike1),
+    bike2: mergeBike(parsed.bike2),
+    bike3: mergeBike(parsed.bike3),
     lapRecords: Array.isArray(parsed.lapRecords) ? parsed.lapRecords : [],
     eventStartTime: parsed.eventStartTime ?? Date.now(),
     eventConfig: parsed.eventConfig ?? DEFAULT_EVENT_CONFIG,

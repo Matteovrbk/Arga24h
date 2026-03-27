@@ -11,6 +11,7 @@ import {
   BarChart3,
   X,
   MessageSquare,
+  Trash2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -29,16 +30,21 @@ import { CircuitSVG } from "./CircuitSVG";
 import { Leaderboard } from "./Leaderboard";
 import { ScoutManager } from "./ScoutManager";
 import { useSharedState } from "./useSharedState";
+import { useSpectatorChat } from "./useSpectatorChat";
 import { AdminLogin, isAdminAuthenticated, logoutAdmin } from "./AdminLogin";
 import { toast, Toaster } from "sonner";
 import {
   BIKE1_COLOR,
   BIKE2_COLOR,
+  BIKE3_COLOR,
   INITIAL_BIKE_STATE,
   DEFAULT_EVENT_CONFIG,
   LAP_VALIDATION_THRESHOLDS,
   formatTimeFull,
   formatDuration,
+  bikeName,
+  bikeShortLabel,
+  bikeColor as getBikeColor,
 } from "./types";
 import type { Scout, CommentaryMessage } from "./types";
 import { useNavigate } from "react-router";
@@ -83,32 +89,38 @@ export function OperatorDashboard() {
 // ── Main dashboard ─────────────────────────────────────────────
 function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const { state, updateState } = useSharedState();
+  const { messages: chatMessages, deleteMessage, clearAllMessages } = useSpectatorChat();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos, setBike1MapPos] = useState(0);
   const [bike2MapPos, setBike2MapPos] = useState(0);
+  const [bike3MapPos, setBike3MapPos] = useState(0);
 
   // Compute real map progress from elapsed time / avg lap time
   const bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).slice(-10);
   const bike1AvgLap = bike1RecentLaps.length > 0 ? bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike1RecentLaps.length : 0;
   const bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
   const bike2AvgLap = bike2RecentLaps.length > 0 ? bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike2RecentLaps.length : 0;
+  const bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).slice(-10);
+  const bike3AvgLap = bike3RecentLaps.length > 0 ? bike3RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike3RecentLaps.length : 0;
   const bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
   const bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
+  const bike3Elapsed = state.bike3.lapStartTime !== null ? currentTime - state.bike3.lapStartTime : 0;
   const bike1Progress = bike1AvgLap > 0 && state.bike1.lapStartTime !== null ? Math.min(0.99, bike1Elapsed / bike1AvgLap) : bike1MapPos;
   const bike2Progress = bike2AvgLap > 0 && state.bike2.lapStartTime !== null ? Math.min(0.99, bike2Elapsed / bike2AvgLap) : bike2MapPos;
+  const bike3Progress = bike3AvgLap > 0 && state.bike3.lapStartTime !== null ? Math.min(0.99, bike3Elapsed / bike3AvgLap) : bike3MapPos;
   const [showScoutManager, setShowScoutManager] = useState(false);
   const [showEventSetup, setShowEventSetup] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
+  const [showChatMod, setShowChatMod] = useState(false);
   const [selectedScoutHistory, setSelectedScoutHistory] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Event‑setup form
+  // Event-setup form
   const [setupName, setSetupName] = useState(DEFAULT_EVENT_CONFIG.eventName);
   const [setupDuration, setSetupDuration] = useState("24");
   const [setupCircuit, setSetupCircuit] = useState("2.61");
-
 
   // Timer tick
   useEffect(() => {
@@ -121,15 +133,18 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     const interval = setInterval(() => {
       if (state.bike1.currentRiderId) setBike1MapPos((p) => (p + 0.008) % 1);
       if (state.bike2.currentRiderId) setBike2MapPos((p) => (p + 0.006) % 1);
+      if (state.bike3.currentRiderId) setBike3MapPos((p) => (p + 0.007) % 1);
     }, 200);
     return () => clearInterval(interval);
-  }, [state.bike1.currentRiderId, state.bike2.currentRiderId]);
+  }, [state.bike1.currentRiderId, state.bike2.currentRiderId, state.bike3.currentRiderId]);
 
   // ── Keyboard shortcuts ───────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bike1OpsRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bike2OpsRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bike3OpsRef = useRef<any>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -146,6 +161,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         case "2":
           bike2OpsRef.current?.onCountLap();
           break;
+        case "3":
+          bike3OpsRef.current?.onCountLap();
+          break;
         case "n":
         case "N":
           bike1OpsRef.current?.onNextScout();
@@ -153,6 +171,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         case "m":
         case "M":
           bike2OpsRef.current?.onNextScout();
+          break;
+        case ",":
+          bike3OpsRef.current?.onNextScout();
           break;
       }
     };
@@ -173,26 +194,28 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     ? Math.min(1, (Date.now() - state.eventConfig.startTime) / state.eventConfig.durationMs)
     : 0;
   const circuitKm = state.eventConfig?.circuitLengthKm ?? 2.61;
-  const totalLaps = state.bike1.totalLaps + state.bike2.totalLaps;
+  const totalLaps = state.bike1.totalLaps + state.bike2.totalLaps + state.bike3.totalLaps;
   const totalDistance = (totalLaps * circuitKm).toFixed(1);
 
   // ── Bike operations ──────────────────────────────────────────
-  const createBikeOps = (bikeKey: "bike1" | "bike2", bikeId: 1 | 2) => ({
+  const createBikeOps = (bikeKey: "bike1" | "bike2" | "bike3", bikeId: 1 | 2 | 3) => ({
     onStartRide: () => {
       const bike = state[bikeKey];
       if (bike.queue.length === 0) return;
       const [nextId, ...rest] = bike.queue;
+      const [, ...restLaps] = bike.queuePlannedLaps;
       updateState((prev) => ({
         ...prev,
         [bikeKey]: {
           ...prev[bikeKey],
           currentRiderId: nextId,
           queue: rest,
+          queuePlannedLaps: restLaps,
           lapStartTime: Date.now() / 1000,
         },
       }));
       const scout = state.scouts.find((s) => s.id === nextId);
-      if (scout) toast.success(`${scout.name} démarre sur le Vélo ${bikeId}`);
+      if (scout) toast.success(`${scout.name} démarre sur ${bikeName(bikeId)}`);
     },
 
     onCountLap: () => {
@@ -201,7 +224,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       const lapTime = Date.now() / 1000 - bike.lapStartTime;
       const scout = state.scouts.find((s) => s.id === bike.currentRiderId);
 
-      // Validation
       const isTooFast = lapTime < LAP_VALIDATION_THRESHOLDS.tooFastSeconds;
       const isTooSlow = lapTime > LAP_VALIDATION_THRESHOLDS.tooSlowSeconds;
 
@@ -215,18 +237,17 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         });
       }
 
-      // Sound
       if (soundEnabled) {
         if (isTooFast || isTooSlow) {
-          playBeep(300, 300); // buzzer
+          playBeep(300, 300);
         } else {
           const bestForScout = state.lapRecords
             .filter((r) => r.scoutId === bike.currentRiderId)
             .reduce((min, r) => Math.min(min, r.lapTime), Infinity);
           if (lapTime < bestForScout) {
-            playBeep(1200, 80, 2); // double beep = record
+            playBeep(1200, 80, 2);
           } else {
-            playBeep(880, 100); // single beep
+            playBeep(880, 100);
           }
         }
       }
@@ -239,7 +260,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               ...prev.commentary,
               {
                 id: crypto.randomUUID(),
-                text: `${scout.name} boucle un tour en ${formatTimeFull(lapTime)} (V${bikeId})`,
+                text: `${scout.name} boucle un tour en ${formatTimeFull(lapTime)} (${bikeShortLabel(bikeId)})`,
                 timestamp: Date.now(),
                 type: "system",
               },
@@ -282,11 +303,12 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       });
 
       if (bikeId === 1) setBike1MapPos(0);
-      else setBike2MapPos(0);
+      else if (bikeId === 2) setBike2MapPos(0);
+      else setBike3MapPos(0);
 
       if (scout && !isTooFast && !isTooSlow) {
         toast(`Tour: ${formatTimeFull(lapTime)}`, {
-          description: `${scout.name} - Vélo ${bikeId}`,
+          description: `${scout.name} - ${bikeName(bikeId)}`,
         });
       }
     },
@@ -295,7 +317,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       const bike = state[bikeKey];
       if (!bike.currentRiderId) return;
 
-      // Traiter le relais comme un tour complété si le rider roule depuis > 5s
       let lapTime = 0;
       let isTooFast = false;
       let isTooSlow = false;
@@ -338,7 +359,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 ...prev.commentary,
                 {
                   id: crypto.randomUUID(),
-                  text: `${scout.name} passe le relais après ${formatTimeFull(lapTime)} (V${bikeId})`,
+                  text: `${scout.name} passe le relais après ${formatTimeFull(lapTime)} (${bikeShortLabel(bikeId)})`,
                   timestamp: Date.now(),
                   type: "system" as const,
                 },
@@ -347,9 +368,10 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
         if (currentBike.queue.length > 0) {
           const [nextId, ...rest] = currentBike.queue;
+          const [, ...restLaps] = currentBike.queuePlannedLaps;
           const nextScout = prev.scouts.find((s) => s.id === nextId);
           if (nextScout) {
-            toast.success(`${nextScout.name} prend le relais sur le Vélo ${bikeId}`);
+            toast.success(`${nextScout.name} prend le relais sur ${bikeName(bikeId)}`);
           }
           return {
             ...prev,
@@ -357,6 +379,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               ...currentBike,
               currentRiderId: nextId,
               queue: rest,
+              queuePlannedLaps: restLaps,
               lapStartTime: Date.now() / 1000,
               totalLaps: shouldCountLap ? currentBike.totalLaps + 1 : currentBike.totalLaps,
             },
@@ -367,7 +390,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             commentary: newCommentary,
           };
         } else {
-          toast.info(`Vélo ${bikeId}: plus personne dans la file`);
+          toast.info(`${bikeName(bikeId)}: plus personne dans la file`);
           return {
             ...prev,
             [bikeKey]: {
@@ -385,37 +408,55 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         }
       });
       if (bikeId === 1) setBike1MapPos(0);
-      else setBike2MapPos(0);
+      else if (bikeId === 2) setBike2MapPos(0);
+      else setBike3MapPos(0);
     },
 
     onAddToQueue: (scoutId: string) => {
       updateState((prev) => ({
         ...prev,
-        [bikeKey]: { ...prev[bikeKey], queue: [...prev[bikeKey].queue, scoutId] },
+        [bikeKey]: {
+          ...prev[bikeKey],
+          queue: [...prev[bikeKey].queue, scoutId],
+          queuePlannedLaps: [...prev[bikeKey].queuePlannedLaps, 1],
+        },
       }));
     },
     onRemoveFromQueue: (index: number) => {
       updateState((prev) => {
         const queue = [...prev[bikeKey].queue];
+        const laps = [...prev[bikeKey].queuePlannedLaps];
         queue.splice(index, 1);
-        return { ...prev, [bikeKey]: { ...prev[bikeKey], queue } };
+        laps.splice(index, 1);
+        return { ...prev, [bikeKey]: { ...prev[bikeKey], queue, queuePlannedLaps: laps } };
       });
     },
     onMoveInQueue: (index: number, direction: "up" | "down") => {
       updateState((prev) => {
         const queue = [...prev[bikeKey].queue];
+        const laps = [...prev[bikeKey].queuePlannedLaps];
         const swapIdx = direction === "up" ? index - 1 : index + 1;
         if (swapIdx < 0 || swapIdx >= queue.length) return prev;
         [queue[index], queue[swapIdx]] = [queue[swapIdx], queue[index]];
-        return { ...prev, [bikeKey]: { ...prev[bikeKey], queue } };
+        [laps[index], laps[swapIdx]] = [laps[swapIdx], laps[index]];
+        return { ...prev, [bikeKey]: { ...prev[bikeKey], queue, queuePlannedLaps: laps } };
+      });
+    },
+    onSetPlannedLaps: (index: number, lapsCount: number) => {
+      updateState((prev) => {
+        const laps = [...prev[bikeKey].queuePlannedLaps];
+        laps[index] = lapsCount;
+        return { ...prev, [bikeKey]: { ...prev[bikeKey], queuePlannedLaps: laps } };
       });
     },
   });
 
   const bike1Ops = createBikeOps("bike1", 1);
   const bike2Ops = createBikeOps("bike2", 2);
+  const bike3Ops = createBikeOps("bike3", 3);
   bike1OpsRef.current = bike1Ops;
   bike2OpsRef.current = bike2Ops;
+  bike3OpsRef.current = bike3Ops;
 
   // ── Handlers ─────────────────────────────────────────────────
   const handleAddScout = (scout: Scout) => {
@@ -429,8 +470,10 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     if (
       state.bike1.currentRiderId === id ||
       state.bike2.currentRiderId === id ||
+      state.bike3.currentRiderId === id ||
       state.bike1.queue.includes(id) ||
-      state.bike2.queue.includes(id)
+      state.bike2.queue.includes(id) ||
+      state.bike3.queue.includes(id)
     ) {
       toast.error("Impossible de supprimer un scout en course ou en file !");
       return;
@@ -438,11 +481,12 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     updateState((prev) => ({ ...prev, scouts: prev.scouts.filter((s) => s.id !== id) }));
   };
   const handleReset = () => {
-    if (window.confirm("CONFIRMATION REQUISE\n\nRéinitialiser toutes les données de course ?\n\n• Tours, temps, commentaires : supprimés\n• Scouts importés : conservés\n• Configuration event : réinitialisée")) {
+    if (window.confirm("CONFIRMATION REQUISE\n\nRéinitialiser toutes les données de course ?\n\n\u2022 Tours, temps, commentaires : supprimés\n\u2022 Scouts importés : conservés\n\u2022 Configuration event : réinitialisée")) {
       updateState((prev) => ({
         ...prev,
         bike1: INITIAL_BIKE_STATE,
         bike2: INITIAL_BIKE_STATE,
+        bike3: INITIAL_BIKE_STATE,
         lapRecords: [],
         eventStartTime: Date.now(),
         commentary: [],
@@ -452,6 +496,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       }));
       setBike1MapPos(0);
       setBike2MapPos(0);
+      setBike3MapPos(0);
       toast.success("Course réinitialisée");
     }
   };
@@ -474,18 +519,16 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   // Export Excel
   const handleExportExcel = () => {
     const wb = XLSX.utils.book_new();
-    // Sheet 1: Tours
     const lapsData = state.lapRecords.map((r) => ({
       Heure: new Date(r.timestamp).toLocaleTimeString("fr-BE"),
       Cycliste: r.scoutName,
       Troupe: r.troupe,
-      Vélo: r.bikeId,
+      "Vélo": bikeName(r.bikeId),
       "Temps (s)": Math.round(r.lapTime * 10) / 10,
       Temps: formatTimeFull(r.lapTime),
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lapsData), "Tours");
 
-    // Sheet 2: Classement
     const bestMap = new Map<string, { name: string; troupe: string; best: number; total: number; count: number }>();
     state.lapRecords.forEach((r) => {
       const e = bestMap.get(r.scoutId);
@@ -509,10 +552,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ranking), "Classement");
 
-    // Sheet 3: Scouts
     XLSX.utils.book_append_sheet(
       wb,
-      XLSX.utils.json_to_sheet(state.scouts.map((s) => ({ Nom: s.name, Troupe: s.troupe, Rôle: s.role }))),
+      XLSX.utils.json_to_sheet(state.scouts.map((s) => ({ Nom: s.name, Troupe: s.troupe, "Rôle": s.role }))),
       "Scouts",
     );
 
@@ -567,16 +609,17 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
   const rider1 = state.scouts.find((s) => s.id === state.bike1.currentRiderId);
   const rider2 = state.scouts.find((s) => s.id === state.bike2.currentRiderId);
+  const rider3 = state.scouts.find((s) => s.id === state.bike3.currentRiderId);
 
   // ── Charts data ──────────────────────────────────────────────
   const cumulativeData = (() => {
     if (state.lapRecords.length === 0) return [];
-    let b1 = 0,
-      b2 = 0;
+    let b1 = 0, b2 = 0, b3 = 0;
     return state.lapRecords.map((r) => {
       if (r.bikeId === 1) b1++;
-      else b2++;
-      return { time: Math.round((r.timestamp - state.eventStartTime) / 60000), bike1: b1, bike2: b2 };
+      else if (r.bikeId === 2) b2++;
+      else b3++;
+      return { time: Math.round((r.timestamp - state.eventStartTime) / 60000), bike1: b1, bike2: b2, bike3: b3 };
     });
   })();
 
@@ -732,9 +775,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                     </span>
                     <span
                       className="px-1.5 py-0.5 rounded text-[9px] font-bold font-['Roboto_Mono'] text-black"
-                      style={{ backgroundColor: r.bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR }}
+                      style={{ backgroundColor: getBikeColor(r.bikeId) }}
                     >
-                      V{r.bikeId}
+                      {bikeShortLabel(r.bikeId)}
                     </span>
                     <span
                       className={`font-['Roboto_Mono'] font-bold ${r.lapTime === best ? "text-[#a855f7]" : "text-[#22c55e]"}`}
@@ -744,6 +787,77 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ));
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Chat Moderation Dialog ────────────────────────── */}
+      {showChatMod && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowChatMod(false)}
+        >
+          <div
+            className="bg-[#111] border border-[#333] rounded-lg p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-widest">Modération Chat</h2>
+                <p className="text-[10px] text-[#888] uppercase tracking-widest mt-1">
+                  {chatMessages.length} messages
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (window.confirm("Supprimer TOUS les messages du chat ?")) {
+                      clearAllMessages();
+                      toast.success("Chat vidé");
+                    }
+                  }}
+                  className="px-2 py-1 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] rounded text-[10px] uppercase tracking-widest text-white transition-colors"
+                >
+                  Tout supprimer
+                </button>
+                <button onClick={() => setShowChatMod(false)} className="text-[#666] hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+              {chatMessages.length === 0 && (
+                <div className="text-center text-[#555] py-8 text-[10px] uppercase tracking-widest">
+                  Aucun message
+                </div>
+              )}
+              {chatMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className="flex items-start gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#222] rounded group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[10px] font-bold text-[#e2a03f]">{msg.author}</span>
+                      <span className="text-[8px] text-[#444] font-['Roboto_Mono']">
+                        {new Date(msg.timestamp).toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-[#ccc] mt-0.5 break-words">{msg.text}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      deleteMessage(msg.id);
+                      toast.success("Message supprimé");
+                    }}
+                    className="p-1 text-[#555] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    title="Supprimer ce message"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -767,7 +881,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 md:gap-5">
-            {/* Countdown */}
             {remaining !== null && remaining > 0 && (
               <>
                 <div className="flex flex-col items-end">
@@ -809,7 +922,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             {/* Buttons */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                onClick={() => navigate("/spectateur")}
+                onClick={() => navigate("/")}
                 className="px-3 py-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 text-white"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -820,6 +933,13 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 className="px-3 py-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[10px] uppercase tracking-widest transition-colors text-white"
               >
                 Effectifs
+              </button>
+              <button
+                onClick={() => setShowChatMod(true)}
+                title="Modération Chat"
+                className="p-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[#888] hover:text-white transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
               </button>
               <button
                 onClick={handleBackup}
@@ -894,10 +1014,16 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           <kbd className="text-[#888] bg-[#222] px-1 rounded">2</kbd> Tour V2
         </span>
         <span>
+          <kbd className="text-[#888] bg-[#222] px-1 rounded">3</kbd> Tour V{"\u03C0"}
+        </span>
+        <span>
           <kbd className="text-[#888] bg-[#222] px-1 rounded">N</kbd> Relais V1
         </span>
         <span>
           <kbd className="text-[#888] bg-[#222] px-1 rounded">M</kbd> Relais V2
+        </span>
+        <span>
+          <kbd className="text-[#888] bg-[#222] px-1 rounded">,</kbd> Relais V{"\u03C0"}
         </span>
       </div>
 
@@ -916,10 +1042,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {/* 3‑column grid (responsive: stacked on mobile) */}
-        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr_320px] lg:grid-cols-[360px_1fr_360px] gap-4 items-start">
-          {/* Bike 1 */}
-          <div className="shadow-lg shadow-blue-900/5">
+        {/* 3 bike queues */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          <div className="shadow-lg shadow-green-900/5">
             <BikeQueue
               bikeId={1}
               bikeState={state.bike1}
@@ -930,56 +1055,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               {...bike1Ops}
             />
           </div>
-
-          {/* Center column */}
-          <div className="flex flex-col gap-4">
-            {/* Map — hidden on small screens */}
-            <div className="hidden md:flex bg-[#111] rounded-md border border-[#222] overflow-hidden flex-col">
-              <div className="px-4 py-2 border-b border-[#222] flex items-center justify-between bg-[#151515]">
-                <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold">Télémétrie Piste</h2>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full animate-pulse"
-                      style={{ backgroundColor: BIKE1_COLOR, opacity: rider1 ? 1 : 0.3 }}
-                    />
-                    <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V1</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full animate-pulse"
-                      style={{ backgroundColor: BIKE2_COLOR, opacity: rider2 ? 1 : 0.3 }}
-                    />
-                    <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V2</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 bg-[#050505] min-h-[250px] flex items-center justify-center relative">
-                <div
-                  className="absolute inset-0 opacity-10 pointer-events-none"
-                  style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "20px 20px" }}
-                />
-                <CircuitSVG
-                  bike1Progress={bike1Progress}
-                  bike2Progress={bike2Progress}
-                  bike1Active={!!rider1}
-                  bike2Active={!!rider2}
-                  bike1Rider={rider1?.name}
-                  bike2Rider={rider2?.name}
-                  dark
-                />
-              </div>
-            </div>
-
-            {/* Leaderboard */}
-            <div className="bg-[#111] rounded-md border border-[#222] p-4 shadow-lg shadow-black/50">
-              <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold mb-3">Classements Généraux</h2>
-              <Leaderboard lapRecords={state.lapRecords} scouts={state.scouts} />
-            </div>
-          </div>
-
-          {/* Bike 2 */}
-          <div className="shadow-lg shadow-red-900/5">
+          <div className="shadow-lg shadow-orange-900/5">
             <BikeQueue
               bikeId={2}
               bikeState={state.bike2}
@@ -989,6 +1065,65 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               lapRecords={state.lapRecords}
               {...bike2Ops}
             />
+          </div>
+          <div className="shadow-lg shadow-red-900/5">
+            <BikeQueue
+              bikeId={3}
+              bikeState={state.bike3}
+              scouts={state.scouts}
+              currentTime={currentTime}
+              color={BIKE3_COLOR}
+              lapRecords={state.lapRecords}
+              {...bike3Ops}
+            />
+          </div>
+        </div>
+
+        {/* Map + Leaderboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Map */}
+          <div className="hidden md:flex bg-[#111] rounded-md border border-[#222] overflow-hidden flex-col">
+            <div className="px-4 py-2 border-b border-[#222] flex items-center justify-between bg-[#151515]">
+              <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold">Télémétrie Piste</h2>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BIKE1_COLOR, opacity: rider1 ? 1 : 0.3 }} />
+                  <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V1</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BIKE2_COLOR, opacity: rider2 ? 1 : 0.3 }} />
+                  <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V2</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BIKE3_COLOR, opacity: rider3 ? 1 : 0.3 }} />
+                  <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">V{"\u03C0"}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-[#050505] min-h-[250px] flex items-center justify-center relative">
+              <div
+                className="absolute inset-0 opacity-10 pointer-events-none"
+                style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+              />
+              <CircuitSVG
+                bike1Progress={bike1Progress}
+                bike2Progress={bike2Progress}
+                bike3Progress={bike3Progress}
+                bike1Active={!!rider1}
+                bike2Active={!!rider2}
+                bike3Active={!!rider3}
+                bike1Rider={rider1?.name}
+                bike2Rider={rider2?.name}
+                bike3Rider={rider3?.name}
+                dark
+              />
+            </div>
+          </div>
+
+          {/* Leaderboard */}
+          <div className="bg-[#111] rounded-md border border-[#222] p-4 shadow-lg shadow-black/50">
+            <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold mb-3">Classements Généraux</h2>
+            <Leaderboard lapRecords={state.lapRecords} scouts={state.scouts} />
           </div>
         </div>
 
@@ -1037,6 +1172,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                     />
                     <Line type="monotone" dataKey="bike1" stroke={BIKE1_COLOR} strokeWidth={2} dot={false} name="Vélo 1" />
                     <Line type="monotone" dataKey="bike2" stroke={BIKE2_COLOR} strokeWidth={2} dot={false} name="Vélo 2" />
+                    <Line type="monotone" dataKey="bike3" stroke={BIKE3_COLOR} strokeWidth={2} dot={false} name={`Vélo \u03C0`} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -1121,9 +1257,9 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                       <td className="py-2 px-4">
                         <span
                           className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[#000] font-bold font-['Roboto_Mono'] text-[9px]"
-                          style={{ backgroundColor: record.bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR }}
+                          style={{ backgroundColor: getBikeColor(record.bikeId) }}
                         >
-                          V{record.bikeId}
+                          {bikeShortLabel(record.bikeId)}
                         </span>
                       </td>
                       <td className="py-2 px-4 font-['Roboto_Mono'] text-right text-[#22c55e]">

@@ -1,21 +1,22 @@
 import { Clock, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import type { LapRecord, Scout } from "./types";
-import { BIKE1_COLOR, BIKE2_COLOR } from "./types";
+import { BIKE1_COLOR, BIKE2_COLOR, BIKE3_COLOR, bikeName, bikeColor as getBikeColor } from "./types";
 
 interface LeaderboardProps {
   lapRecords: LapRecord[];
   scouts: Scout[];
 }
 
-type FilterMode = "all" | "bike1" | "bike2" | "Ungava" | "Argapura";
+type FilterMode = "all" | "bike1" | "bike2" | "bike3" | "Ungava" | "Argapura";
 
 const FILTERS: { key: FilterMode; label: string; color: string }[] = [
-  { key: "all",     label: "Tous",    color: "#888"       },
-  { key: "bike1",   label: "Vélo 1",  color: BIKE1_COLOR  },
-  { key: "bike2",   label: "Vélo 2",  color: BIKE2_COLOR  },
-  { key: "Ungava",  label: "Ungava",  color: "#3b82f6"    },
-  { key: "Argapura",label: "Argapura",color: "#ef4444"    },
+  { key: "all",      label: "Tous",       color: "#888"       },
+  { key: "bike1",    label: "V\u00e9lo 1", color: BIKE1_COLOR  },
+  { key: "bike2",    label: "V\u00e9lo 2", color: BIKE2_COLOR  },
+  { key: "bike3",    label: "V\u00e9lo \u03C0", color: BIKE3_COLOR  },
+  { key: "Ungava",   label: "Ungava",     color: "#3b82f6"    },
+  { key: "Argapura", label: "Argapura",   color: "#ef4444"    },
 ];
 
 export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
@@ -32,12 +33,13 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
   const filtered = lapRecords.filter((r) => {
     if (filter === "bike1") return r.bikeId === 1;
     if (filter === "bike2") return r.bikeId === 2;
+    if (filter === "bike3") return r.bikeId === 3;
     if (filter === "Ungava" || filter === "Argapura") return r.troupe === filter;
     return true;
   });
 
   // Best lap times
-  const bestTimes = new Map<string, { time: number; name: string; bikeId: 1 | 2; troupe: string }>();
+  const bestTimes = new Map<string, { time: number; name: string; bikeId: 1 | 2 | 3; troupe: string }>();
   filtered.forEach((r) => {
     const existing = bestTimes.get(r.scoutId);
     if (!existing || r.lapTime < existing.time) {
@@ -49,14 +51,15 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
     .sort((a, b) => a.time - b.time);
 
   // Average times
-  const avgMap = new Map<string, { total: number; count: number; name: string; troupe: string; bike1: number; bike2: number }>();
+  const avgMap = new Map<string, { total: number; count: number; name: string; troupe: string; bike1: number; bike2: number; bike3: number }>();
   filtered.forEach((r) => {
     const existing = avgMap.get(r.scoutId);
     if (existing) {
       existing.total += r.lapTime;
       existing.count += 1;
       if (r.bikeId === 1) existing.bike1++;
-      else existing.bike2++;
+      else if (r.bikeId === 2) existing.bike2++;
+      else existing.bike3++;
     } else {
       avgMap.set(r.scoutId, {
         total: r.lapTime,
@@ -65,6 +68,7 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
         troupe: r.troupe,
         bike1: r.bikeId === 1 ? 1 : 0,
         bike2: r.bikeId === 2 ? 1 : 0,
+        bike3: r.bikeId === 3 ? 1 : 0,
       });
     }
   });
@@ -75,12 +79,12 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
       troupe: data.troupe,
       avg: data.total / data.count,
       laps: data.count,
-      mainBike: data.bike1 >= data.bike2 ? (1 as const) : (2 as const),
+      mainBike: (data.bike1 >= data.bike2 && data.bike1 >= data.bike3 ? 1 : data.bike2 >= data.bike3 ? 2 : 3) as 1 | 2 | 3,
     }))
     .sort((a, b) => a.avg - b.avg);
 
-  const bikeLabel = (bikeId: 1 | 2) => `Vélo ${bikeId}`;
-  const bikeColor = (bikeId: 1 | 2) => (bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR);
+  const bikeLabel = (bikeId: 1 | 2 | 3) => bikeName(bikeId);
+  const bikeClr = (bikeId: 1 | 2 | 3) => getBikeColor(bikeId);
 
   return (
     <div className="flex flex-col gap-3 font-['Inter']">
@@ -146,7 +150,7 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
                   <div className="text-center font-['Roboto_Mono'] text-[10px] font-bold text-[#888]">{i + 1}</div>
                   <div className="min-w-0 pr-2">
                     <div className="text-[11px] font-bold text-[#ddd] uppercase truncate">{entry.name}</div>
-                    <div className="text-[9px] uppercase tracking-widest mt-0.5 font-bold" style={{ color: bikeColor(entry.bikeId) }}>
+                    <div className="text-[9px] uppercase tracking-widest mt-0.5 font-bold" style={{ color: bikeClr(entry.bikeId) }}>
                       {bikeLabel(entry.bikeId)}
                     </div>
                   </div>
@@ -174,7 +178,7 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
                   <div className="min-w-0 pr-2">
                     <div className="text-[11px] font-bold text-[#ddd] uppercase truncate">{entry.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: bikeColor(entry.mainBike) }}>
+                      <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: bikeClr(entry.mainBike) }}>
                         {bikeLabel(entry.mainBike)}
                       </span>
                       <span className="text-[9px] text-[#555] font-['Roboto_Mono']">{entry.laps} TOURS</span>

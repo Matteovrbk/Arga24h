@@ -5,10 +5,10 @@ import { SpectatorView } from "./components/SpectatorView";
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: OperatorDashboard,
+    Component: SpectatorView,
   },
   {
-    path: "/spectateur",
-    Component: SpectatorView,
+    path: "/admin",
+    Component: OperatorDashboard,
   },
 ]);

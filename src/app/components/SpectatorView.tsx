@@ -6,13 +6,18 @@ import { CircuitSVG } from "./CircuitSVG";
 import {
   BIKE1_COLOR,
   BIKE2_COLOR,
+  BIKE3_COLOR,
   formatTimeFull,
   formatTimeShort,
   formatDuration,
+  bikeShortLabel,
+  bikeColor as getBikeColor,
 } from "./types";
 import type { LapRecord } from "./types";
 import { ArrowLeft, Clock, Activity, Maximize, Send } from "lucide-react";
 import QRCode from "react-qr-code";
+
+const SHARE_URL = "https://www.ungapura24h.xyz/";
 
 export function SpectatorView() {
   const { state } = useSharedState(true);
@@ -21,8 +26,9 @@ export function SpectatorView() {
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos] = useState(0);
   const [bike2MapPos] = useState(0);
+  const [bike3MapPos] = useState(0);
   const [flashLap, setFlashLap] = useState<LapRecord | null>(null);
-  const [spectatorFilter, setSpectatorFilter] = useState<"all" | "bike1" | "bike2" | "Ungava" | "Argapura">("all");
+  const [spectatorFilter, setSpectatorFilter] = useState<"all" | "bike1" | "bike2" | "bike3" | "Ungava" | "Argapura">("all");
   const [rightTab, setRightTab] = useState<"leaderboard" | "chat">("leaderboard");
   const [unreadChat, setUnreadChat] = useState(0);
   const [lastSeenChatCount, setLastSeenChatCount] = useState(0);
@@ -41,10 +47,14 @@ export function SpectatorView() {
   const _bike1AvgLap = _bike1RecentLaps.length > 0 ? _bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike1RecentLaps.length : 0;
   const _bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
   const _bike2AvgLap = _bike2RecentLaps.length > 0 ? _bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike2RecentLaps.length : 0;
+  const _bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).slice(-10);
+  const _bike3AvgLap = _bike3RecentLaps.length > 0 ? _bike3RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike3RecentLaps.length : 0;
   const _bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
   const _bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
+  const _bike3Elapsed = state.bike3.lapStartTime !== null ? currentTime - state.bike3.lapStartTime : 0;
   const realBike1Pos = _bike1AvgLap > 0 && state.bike1.lapStartTime !== null ? Math.min(0.99, _bike1Elapsed / _bike1AvgLap) : bike1MapPos;
   const realBike2Pos = _bike2AvgLap > 0 && state.bike2.lapStartTime !== null ? Math.min(0.99, _bike2Elapsed / _bike2AvgLap) : bike2MapPos;
+  const realBike3Pos = _bike3AvgLap > 0 && state.bike3.lapStartTime !== null ? Math.min(0.99, _bike3Elapsed / _bike3AvgLap) : bike3MapPos;
 
   // Auto-scroll chat
   useEffect(() => {
@@ -89,32 +99,39 @@ export function SpectatorView() {
 
   const rider1 = state.scouts.find((s) => s.id === state.bike1.currentRiderId);
   const rider2 = state.scouts.find((s) => s.id === state.bike2.currentRiderId);
+  const rider3 = state.scouts.find((s) => s.id === state.bike3.currentRiderId);
 
   const elapsed1 =
     state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
   const elapsed2 =
     state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
+  const elapsed3 =
+    state.bike3.lapStartTime !== null ? currentTime - state.bike3.lapStartTime : 0;
+
+  const totalLaps = state.bike1.totalLaps + state.bike2.totalLaps + state.bike3.totalLaps;
 
   const SPECTATOR_FILTERS = [
-    { key: "all" as const,      label: "TOUS",     color: "#888"      },
-    { key: "bike1" as const,    label: "V1",       color: BIKE1_COLOR },
-    { key: "bike2" as const,    label: "V2",       color: BIKE2_COLOR },
-    { key: "Ungava" as const,   label: "UNGAVA",   color: "#3b82f6"   },
-    { key: "Argapura" as const, label: "ARGAPURA", color: "#ef4444"   },
+    { key: "all" as const,      label: "TOUS",       color: "#888"      },
+    { key: "bike1" as const,    label: "V1",         color: BIKE1_COLOR },
+    { key: "bike2" as const,    label: "V2",         color: BIKE2_COLOR },
+    { key: "bike3" as const,    label: "V\u03C0",    color: BIKE3_COLOR },
+    { key: "Ungava" as const,   label: "UNGAVA",     color: "#3b82f6"   },
+    { key: "Argapura" as const, label: "ARGAPURA",   color: "#ef4444"   },
   ];
 
   const filteredRecords = state.lapRecords.filter((r) => {
     if (spectatorFilter === "bike1") return r.bikeId === 1;
     if (spectatorFilter === "bike2") return r.bikeId === 2;
+    if (spectatorFilter === "bike3") return r.bikeId === 3;
     if (spectatorFilter === "Ungava" || spectatorFilter === "Argapura") return r.troupe === spectatorFilter;
     return true;
   });
 
-  const bestTimesMap = new Map<string, { time: number; name: string; troupe: string; bikeId: 1 | 2; laps: number }>();
+  const bestTimesMap = new Map<string, { time: number; name: string; troupe: string; bikeId: 1 | 2 | 3; laps: number }>();
   filteredRecords.forEach((r) => {
     const existing = bestTimesMap.get(r.scoutId);
     if (!existing || r.lapTime < existing.time) {
-      bestTimesMap.set(r.scoutId, { time: r.lapTime, name: r.scoutName, troupe: r.troupe, bikeId: r.bikeId as 1 | 2, laps: 0 });
+      bestTimesMap.set(r.scoutId, { time: r.lapTime, name: r.scoutName, troupe: r.troupe, bikeId: r.bikeId as 1 | 2 | 3, laps: 0 });
     }
   });
   filteredRecords.forEach((r) => {
@@ -140,11 +157,11 @@ export function SpectatorView() {
       <header className="h-[40px] bg-[#111] border-b border-[#222] flex items-center justify-between px-4 sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/admin")}
             className="text-[#666] hover:text-[#fff] transition-colors flex items-center gap-1 text-[10px] uppercase tracking-widest"
           >
             <ArrowLeft className="w-3 h-3" />
-            Opérateur
+            Admin
           </button>
           <div className="w-px h-4 bg-[#333]" />
           <div className="flex items-center gap-2">
@@ -168,14 +185,14 @@ export function SpectatorView() {
           <div className="flex items-center gap-3">
             <span className="text-[10px] text-[#666] uppercase tracking-widest">TOURS: </span>
             <div className="font-['Roboto_Mono'] text-[#fff] text-sm">
-              {state.bike1.totalLaps + state.bike2.totalLaps}
+              {totalLaps}
             </div>
           </div>
           <div className="w-px h-4 bg-[#333]" />
           <div className="flex items-center gap-3">
             <span className="text-[10px] text-[#666] uppercase tracking-widest">DIST: </span>
             <div className="font-['Roboto_Mono'] text-[#22c55e] text-sm">
-              {((state.bike1.totalLaps + state.bike2.totalLaps) * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1)} km
+              {(totalLaps * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1)} km
             </div>
           </div>
           {remaining !== null && remaining > 0 && (
@@ -216,7 +233,7 @@ export function SpectatorView() {
           <div className="bg-[#111] border border-[#333] p-3 shadow-2xl min-w-[300px] flex items-stretch">
             <div
               className="w-1.5 flex-shrink-0"
-              style={{ backgroundColor: flashLap.bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR }}
+              style={{ backgroundColor: getBikeColor(flashLap.bikeId as 1 | 2 | 3) }}
             />
             <div className="ml-3 flex-1">
               <div className="text-[10px] text-[#888] uppercase tracking-widest mb-1">Nouveau Tour Terminé</div>
@@ -232,7 +249,7 @@ export function SpectatorView() {
       )}
 
       <main className="flex-1 max-w-[1920px] mx-auto w-full flex flex-col md:flex-row overflow-hidden">
-        
+
         {/* LEFT COLUMN: Track Status & Map */}
         <div className="w-full md:w-[400px] flex-shrink-0 border-r border-[#222] flex flex-col bg-[#080808]">
           {/* Section Header */}
@@ -244,71 +261,80 @@ export function SpectatorView() {
           </div>
 
           {/* Bike 1 Box */}
-          <div className="p-4 border-b border-[#222] relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl pointer-events-none" />
-            <div className="flex justify-between items-start mb-2">
+          <div className="p-3 border-b border-[#222] relative overflow-hidden">
+            <div className="flex justify-between items-start mb-1">
               <div className="flex items-center gap-2">
-                <div className="bg-[#3b82f6] text-black w-6 h-6 flex items-center justify-center font-bold font-['Roboto_Mono'] text-xs">
+                <div className="bg-[#16a34a] text-black w-5 h-5 flex items-center justify-center font-bold font-['Roboto_Mono'] text-[10px]">
                   1
                 </div>
-                <span className="text-sm font-bold text-[#ccc] tracking-widest uppercase">
+                <span className="text-xs font-bold text-[#ccc] tracking-widest uppercase">
                   Vélo 1
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-[#666] tracking-widest uppercase mb-0.5">Tours</div>
-                <div className="font-['Roboto_Mono'] text-[#fff]">{state.bike1.totalLaps}</div>
+                <div className="text-[9px] text-[#666] tracking-widest uppercase">Tours</div>
+                <div className="font-['Roboto_Mono'] text-[#fff] text-sm">{state.bike1.totalLaps}</div>
               </div>
             </div>
-            
-            <div className="mt-4 flex flex-col gap-1">
-              <div className="text-[10px] text-[#666] tracking-widest uppercase">Cycliste</div>
-              <div className="text-2xl font-bold tracking-tight text-[#fff] uppercase truncate">
-                {rider1 ? rider1.name : "AUCUN CYCLISTE"}
+            <div className="flex justify-between items-end">
+              <div className="text-lg font-bold tracking-tight text-[#fff] uppercase truncate">
+                {rider1 ? rider1.name : "—"}
               </div>
-            </div>
-
-            <div className="mt-4 flex justify-between items-end">
-              <div>
-                <div className="text-[10px] text-[#666] tracking-widest uppercase mb-0.5">Temps en cours</div>
-                <div className="font-['Roboto_Mono'] text-xl text-[#eab308]">
-                  {rider1 ? formatTimeShort(elapsed1) : "--:--"}
-                </div>
+              <div className="font-['Roboto_Mono'] text-[#eab308]">
+                {rider1 ? formatTimeShort(elapsed1) : "--:--"}
               </div>
             </div>
           </div>
 
           {/* Bike 2 Box */}
-          <div className="p-4 border-b border-[#222] relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl pointer-events-none" />
-            <div className="flex justify-between items-start mb-2">
+          <div className="p-3 border-b border-[#222] relative overflow-hidden">
+            <div className="flex justify-between items-start mb-1">
               <div className="flex items-center gap-2">
-                <div className="bg-[#ef4444] text-black w-6 h-6 flex items-center justify-center font-bold font-['Roboto_Mono'] text-xs">
+                <div className="bg-[#ea580c] text-black w-5 h-5 flex items-center justify-center font-bold font-['Roboto_Mono'] text-[10px]">
                   2
                 </div>
-                <span className="text-sm font-bold text-[#ccc] tracking-widest uppercase">
+                <span className="text-xs font-bold text-[#ccc] tracking-widest uppercase">
                   Vélo 2
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-[#666] tracking-widest uppercase mb-0.5">Tours</div>
-                <div className="font-['Roboto_Mono'] text-[#fff]">{state.bike2.totalLaps}</div>
+                <div className="text-[9px] text-[#666] tracking-widest uppercase">Tours</div>
+                <div className="font-['Roboto_Mono'] text-[#fff] text-sm">{state.bike2.totalLaps}</div>
               </div>
             </div>
-            
-            <div className="mt-4 flex flex-col gap-1">
-              <div className="text-[10px] text-[#666] tracking-widest uppercase">Cycliste</div>
-              <div className="text-2xl font-bold tracking-tight text-[#fff] uppercase truncate">
-                {rider2 ? rider2.name : "AUCUN CYCLISTE"}
+            <div className="flex justify-between items-end">
+              <div className="text-lg font-bold tracking-tight text-[#fff] uppercase truncate">
+                {rider2 ? rider2.name : "—"}
+              </div>
+              <div className="font-['Roboto_Mono'] text-[#eab308]">
+                {rider2 ? formatTimeShort(elapsed2) : "--:--"}
               </div>
             </div>
+          </div>
 
-            <div className="mt-4 flex justify-between items-end">
-              <div>
-                <div className="text-[10px] text-[#666] tracking-widest uppercase mb-0.5">Temps en cours</div>
-                <div className="font-['Roboto_Mono'] text-xl text-[#eab308]">
-                  {rider2 ? formatTimeShort(elapsed2) : "--:--"}
+          {/* Bike Pi Box */}
+          <div className="p-3 border-b border-[#222] relative overflow-hidden">
+            <div className="flex justify-between items-start mb-1">
+              <div className="flex items-center gap-2">
+                <div className="bg-[#dc2626] text-black w-5 h-5 flex items-center justify-center font-bold font-['Roboto_Mono'] text-[10px]">
+                  {"\u03C0"}
                 </div>
+                <span className="text-xs font-bold text-[#ccc] tracking-widest uppercase">
+                  Vélo {"\u03C0"}
+                </span>
+                <span className="text-[8px] text-[#666] uppercase tracking-widest">CuPiDon</span>
+              </div>
+              <div className="text-right">
+                <div className="text-[9px] text-[#666] tracking-widest uppercase">Tours</div>
+                <div className="font-['Roboto_Mono'] text-[#fff] text-sm">{state.bike3.totalLaps}</div>
+              </div>
+            </div>
+            <div className="flex justify-between items-end">
+              <div className="text-lg font-bold tracking-tight text-[#fff] uppercase truncate">
+                {rider3 ? rider3.name : "—"}
+              </div>
+              <div className="font-['Roboto_Mono'] text-[#eab308]">
+                {rider3 ? formatTimeShort(elapsed3) : "--:--"}
               </div>
             </div>
           </div>
@@ -321,16 +347,19 @@ export function SpectatorView() {
               </span>
             </div>
             <div className="flex-1 p-4 bg-[#0a0a0a] flex items-center justify-center relative min-h-[250px]">
-              <div className="absolute inset-0 opacity-20 pointer-events-none" 
+              <div className="absolute inset-0 opacity-20 pointer-events-none"
                    style={{ backgroundImage: "radial-gradient(#333 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
               <div className="relative z-10 w-full">
                 <CircuitSVG
                   bike1Progress={realBike1Pos}
                   bike2Progress={realBike2Pos}
+                  bike3Progress={realBike3Pos}
                   bike1Active={!!rider1}
                   bike2Active={!!rider2}
+                  bike3Active={!!rider3}
                   bike1Rider={rider1?.name}
                   bike2Rider={rider2?.name}
+                  bike3Rider={rider3?.name}
                   dark
                 />
               </div>
@@ -350,13 +379,13 @@ export function SpectatorView() {
                 </div>
               );
               const avgLapTime = recentLaps.reduce((s, r) => s + r.lapTime, 0) / recentLaps.length;
-              const totalLaps = state.bike1.totalLaps + state.bike2.totalLaps;
               const elapsedMs = Date.now() - state.eventStartTime;
               const totalDuration = state.eventConfig?.durationMs ?? 86400000;
               const remainingMs = Math.max(0, (state.eventConfig ? state.eventConfig.startTime + totalDuration - Date.now() : totalDuration - elapsedMs));
               const predictedRemainingLaps = Math.floor(remainingMs / 1000 / avgLapTime);
               const predictedTotalLaps = totalLaps + predictedRemainingLaps;
               const predictedKm = (predictedTotalLaps * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1);
+
               return (
                 <div className="space-y-1">
                   <div className="flex justify-between">
@@ -389,10 +418,10 @@ export function SpectatorView() {
             </div>
               <div className="flex items-center gap-2">
               <code className="flex-1 text-[10px] font-['Roboto_Mono'] text-[#aaa] bg-[#111] border border-[#222] rounded px-2 py-1.5 truncate">
-                {window.location.href}
+                {SHARE_URL}
               </code>
               <button
-                onClick={() => navigator.clipboard.writeText(window.location.href)}
+                onClick={() => navigator.clipboard.writeText(SHARE_URL)}
                 className="px-2 py-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[10px] uppercase tracking-widest text-[#aaa] hover:text-white transition-colors shrink-0"
               >
                 Copier
@@ -454,7 +483,7 @@ export function SpectatorView() {
                     const gap = i === 0 ? "" : `+${formatTimeFull(entry.time - fastestLap)}`;
                     const podiumColors = ["#ffd700", "#c0c0c0", "#cd7f32"];
                     const podiumColor = i < 3 ? podiumColors[i] : null;
-                    const bikeColor = entry.bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR;
+                    const bColor = getBikeColor(entry.bikeId);
 
                     return (
                       <div
@@ -462,7 +491,7 @@ export function SpectatorView() {
                         className={`grid grid-cols-[30px_1fr_55px_80px_80px_55px] items-center border-b border-[#1a1a1a] transition-colors ${
                           i === 0 ? "bg-[#0d0d0d]" : "hover:bg-[#0a0a0a]"
                         }`}
-                        style={i === 0 ? { boxShadow: `inset 3px 0 0 ${bikeColor}` } : {}}
+                        style={i === 0 ? { boxShadow: `inset 3px 0 0 ${bColor}` } : {}}
                       >
                         {/* Position */}
                         <div className="text-center py-2.5">
@@ -473,7 +502,7 @@ export function SpectatorView() {
 
                         {/* Name */}
                         <div className="flex items-center gap-2 overflow-hidden px-2 py-2.5">
-                          <div className="w-1 h-[14px] flex-shrink-0 rounded-sm" style={{ backgroundColor: bikeColor }} />
+                          <div className="w-1 h-[14px] flex-shrink-0 rounded-sm" style={{ backgroundColor: bColor }} />
                           <span
                             className={`font-semibold tracking-wide uppercase truncate ${i === 0 ? "text-white text-sm" : "text-[#aaa] text-xs"}`}
                           >
@@ -489,8 +518,8 @@ export function SpectatorView() {
 
                         {/* Bike */}
                         <div className="text-center py-2.5">
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: bikeColor + "22", color: bikeColor }}>
-                            V{entry.bikeId}
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: bColor + "22", color: bColor }}>
+                            {bikeShortLabel(entry.bikeId)}
                           </span>
                         </div>
 
@@ -502,7 +531,7 @@ export function SpectatorView() {
 
                         {/* Gap */}
                         <div className="font-['Roboto_Mono'] text-[#555] text-right pr-4 py-2.5 text-[10px]">
-                          {i === 0 ? "—" : gap}
+                          {i === 0 ? "\u2014" : gap}
                         </div>
 
                         {/* Laps */}
@@ -523,7 +552,7 @@ export function SpectatorView() {
               <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-2">
                 {chatMessages.length === 0 && (
                   <div className="text-center text-[#444] py-8 text-[10px] uppercase tracking-widest">
-                    Aucun message — sois le premier ! 👋
+                    Aucun message — sois le premier !
                   </div>
                 )}
                 {chatMessages.map((msg) => (
@@ -545,7 +574,7 @@ export function SpectatorView() {
                 <input
                   value={chatAuthor}
                   onChange={(e) => { setChatAuthor(e.target.value); sessionStorage.setItem("sp51_chat_name", e.target.value); }}
-                  placeholder="Ton prénom…"
+                  placeholder="Ton prénom..."
                   maxLength={30}
                   className="w-full bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#e2a03f]"
                 />
@@ -556,7 +585,7 @@ export function SpectatorView() {
                   <input
                     value={chatText}
                     onChange={(e) => setChatText(e.target.value)}
-                    placeholder={chatConnected ? "Écris un message…" : "Chat hors-ligne"}
+                    placeholder={chatConnected ? "Écris un message..." : "Chat hors-ligne"}
                     maxLength={200}
                     disabled={!chatConnected}
                     className="flex-1 bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#3b82f6] disabled:opacity-40"
@@ -617,9 +646,9 @@ export function SpectatorView() {
                   ))}
                   {state.lapRecords.slice(-5).map((lap, i) => (
                     <div key={`lap-${i}`} className="flex items-center gap-2">
-                      <span className="text-[#888] text-[10px] font-['Roboto_Mono']">V{lap.bikeId}</span>
+                      <span className="text-[#888] text-[10px] font-['Roboto_Mono']">{bikeShortLabel(lap.bikeId as 1 | 2 | 3)}</span>
                       <span className="font-semibold text-[#ddd] uppercase text-xs">{lap.scoutName}</span>
-                      <span className="font-['Roboto_Mono']" style={{ color: lap.bikeId === 1 ? BIKE1_COLOR : BIKE2_COLOR }}>
+                      <span className="font-['Roboto_Mono']" style={{ color: getBikeColor(lap.bikeId as 1 | 2 | 3) }}>
                         {formatTimeFull(lap.lapTime)}
                       </span>
                     </div>
@@ -640,8 +669,8 @@ export function SpectatorView() {
           onClick={() => setShowQR(false)}
         >
           <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <QRCode value={window.location.href} size={200} />
-            <p className="text-black text-xs font-['Roboto_Mono'] text-center max-w-[200px] break-all">{window.location.href}</p>
+            <QRCode value={SHARE_URL} size={200} />
+            <p className="text-black text-xs font-['Roboto_Mono'] text-center max-w-[200px] break-all">{SHARE_URL}</p>
             <button
               onClick={() => setShowQR(false)}
               className="text-[11px] uppercase tracking-widest text-[#666] hover:text-black transition-colors"
