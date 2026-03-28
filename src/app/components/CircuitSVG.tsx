@@ -131,6 +131,7 @@ interface CircuitSVGProps {
   bike2Rider?: string;
   bike3Rider?: string;
   dark?: boolean;
+  compact?: boolean;
 }
 
 export function CircuitSVG({
@@ -144,6 +145,7 @@ export function CircuitSVG({
   bike2Rider,
   bike3Rider,
   dark = false,
+  compact = false,
 }: CircuitSVGProps) {
   const pos1 = useMemo(() => getPositionOnCircuit(bike1Progress), [bike1Progress]);
   const pos2 = useMemo(() => getPositionOnCircuit(bike2Progress), [bike2Progress]);
@@ -156,7 +158,7 @@ export function CircuitSVG({
   ];
 
   return (
-    <div className="relative w-full" style={{ height: 280, isolation: "isolate" }}>
+    <div className="relative w-full" style={{ height: compact ? 180 : 280, isolation: "isolate" }}>
       <MapContainer
         center={MAP_CENTER}
         zoom={14.8}
