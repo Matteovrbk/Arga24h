@@ -10,7 +10,7 @@ import {
   User,
   Search,
 } from "lucide-react";
-import type { Scout, BikeState, LapRecord } from "./types";
+import type { Scout, BikeState, LapRecord, MaintenanceState } from "./types";
 import { bikeName, bikeShortLabel, formatTimeShort, troupeColor } from "./types";
 
 interface BikeQueueProps {
@@ -28,6 +28,7 @@ interface BikeQueueProps {
   currentTime: number;
   color: string;
   lapRecords: LapRecord[];
+  maintenance?: MaintenanceState;
 }
 
 export function BikeQueue({
@@ -45,6 +46,7 @@ export function BikeQueue({
   currentTime,
   color,
   lapRecords,
+  maintenance,
 }: BikeQueueProps) {
   const [searchText, setSearchText] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -64,10 +66,15 @@ export function BikeQueue({
     return true;
   });
 
+  const maintenanceActive = !!maintenance?.active;
+  const pausedAtSec = maintenance?.pausedAt ? maintenance.pausedAt / 1000 : null;
+  const effectiveTime = maintenanceActive && pausedAtSec !== null ? pausedAtSec : currentTime;
   const elapsedTime =
-    bikeState.lapStartTime !== null ? currentTime - bikeState.lapStartTime : 0;
+    bikeState.lapStartTime !== null ? effectiveTime - bikeState.lapStartTime : 0;
 
-  const bikeLaps = lapRecords.filter((r) => r.bikeId === bikeId);
+  const bikeLaps = lapRecords
+    .filter((r) => r.bikeId === bikeId)
+    .sort((a, b) => a.timestamp - b.timestamp);
   const recentLaps = bikeLaps.slice(-10);
   const avgLapTime =
     recentLaps.length > 0
@@ -181,9 +188,13 @@ export function BikeQueue({
             <div className="flex flex-col items-end gap-2">
               <div>
                 <div className="text-[10px] text-[#666] uppercase tracking-widest mb-1 text-right">
-                  Chrono en cours
+                  {maintenanceActive ? (
+                    <span className="text-[#f97316] font-bold">PAUSÉ — MAINTENANCE</span>
+                  ) : (
+                    "Chrono en cours"
+                  )}
                 </div>
-                <div className="flex items-center gap-1 text-2xl font-bold font-['Roboto_Mono'] tabular-nums leading-none text-[#eab308]">
+                <div className={`flex items-center gap-1 text-2xl font-bold font-['Roboto_Mono'] tabular-nums leading-none ${maintenanceActive ? "text-[#f97316]" : "text-[#eab308]"}`}>
                   {formatTimeShort(elapsedTime)}
                 </div>
               </div>

@@ -25,6 +25,7 @@ function useNow(intervalMs = 1000) {
 function avgLapTime(lapRecords: AppState["lapRecords"], bikeId: 1 | 2 | 3, n = 10): number {
   const relevant = lapRecords
     .filter((r) => r.bikeId === bikeId)
+    .sort((a, b) => a.timestamp - b.timestamp)
     .slice(-n);
   if (relevant.length === 0) return 600; // default 10 min
   const sum = relevant.reduce((acc, r) => acc + r.lapTime, 0);

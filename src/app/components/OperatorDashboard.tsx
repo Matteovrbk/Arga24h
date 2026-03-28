@@ -14,6 +14,8 @@ import {
   Trash2,
   Bell,
   BellOff,
+  Wrench,
+  History,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -48,7 +50,7 @@ import {
   bikeShortLabel,
   bikeColor as getBikeColor,
 } from "./types";
-import type { Scout, CommentaryMessage } from "./types";
+import type { Scout, CommentaryMessage, MaintenanceState } from "./types";
 import { useNavigate } from "react-router";
 
 // ── Sound helpers ──────────────────────────────────────────────
@@ -99,11 +101,11 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const [bike3MapPos, setBike3MapPos] = useState(0);
 
   // Compute real map progress from elapsed time / avg lap time
-  const bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).slice(-10);
+  const bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const bike1AvgLap = bike1RecentLaps.length > 0 ? bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike1RecentLaps.length : 0;
-  const bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
+  const bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const bike2AvgLap = bike2RecentLaps.length > 0 ? bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike2RecentLaps.length : 0;
-  const bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).slice(-10);
+  const bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const bike3AvgLap = bike3RecentLaps.length > 0 ? bike3RecentLaps.reduce((s, r) => s + r.lapTime, 0) / bike3RecentLaps.length : 0;
   const bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
   const bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
@@ -677,6 +679,37 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     toast.success("Course lancée ! Bonne chance à tous !");
   };
 
+  // ── Maintenance toggle ───────────────────────────────────────
+  const handleToggleMaintenance = () => {
+    const isActive = state.maintenance?.active;
+    if (!isActive) {
+      updateState((prev) => ({
+        ...prev,
+        maintenance: { active: true, pausedAt: Date.now() } satisfies MaintenanceState,
+      }));
+      toast.warning("Mode maintenance activé — chrono des coureurs pausés");
+    } else {
+      const pausedAt = state.maintenance?.pausedAt ?? Date.now();
+      const pauseDurationSec = (Date.now() - pausedAt) / 1000;
+      updateState((prev) => ({
+        ...prev,
+        bike1: prev.bike1.currentRiderId !== null && prev.bike1.lapStartTime !== null
+          ? { ...prev.bike1, lapStartTime: prev.bike1.lapStartTime + pauseDurationSec }
+          : prev.bike1,
+        bike2: prev.bike2.currentRiderId !== null && prev.bike2.lapStartTime !== null
+          ? { ...prev.bike2, lapStartTime: prev.bike2.lapStartTime + pauseDurationSec }
+          : prev.bike2,
+        bike3: prev.bike3.currentRiderId !== null && prev.bike3.lapStartTime !== null
+          ? { ...prev.bike3, lapStartTime: prev.bike3.lapStartTime + pauseDurationSec }
+          : prev.bike3,
+        maintenance: { active: false, pausedAt: null } satisfies MaintenanceState,
+      }));
+      toast.success("Maintenance terminée — chrono des coureurs repris");
+    }
+  };
+
+  const maintenanceActive = !!state.maintenance?.active;
+
   const rider1 = state.scouts.find((s) => s.id === state.bike1.currentRiderId);
   const rider2 = state.scouts.find((s) => s.id === state.bike2.currentRiderId);
   const rider3 = state.scouts.find((s) => s.id === state.bike3.currentRiderId);
@@ -986,7 +1019,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* ── Header ─────────────────────────────────────────── */}
-      <header className="bg-[#111] border-b border-[#222] px-4 md:px-6 py-2 sticky top-0 z-20">
+      <header className={`bg-[#111] border-b px-4 md:px-6 py-2 sticky top-0 z-20 transition-colors ${maintenanceActive ? "border-[#f97316] shadow-[0_2px_16px_rgba(249,115,22,0.25)]" : "border-[#222]"}`}>
         <div className="max-w-[1800px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <div className="bg-[#e11d48] text-white p-1.5 rounded-md shadow-[0_0_10px_rgba(225,29,72,0.5)]">
@@ -1043,6 +1076,25 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
             {/* Buttons */}
             <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={handleToggleMaintenance}
+                title={maintenanceActive ? "Terminer la maintenance" : "Activer la maintenance"}
+                className={`px-3 py-1.5 border rounded text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 font-bold ${
+                  maintenanceActive
+                    ? "bg-[#f97316] border-[#f97316] text-black animate-pulse"
+                    : "bg-[#1c1007] border-[#7c3200] text-[#f97316] hover:bg-[#2d1a0a]"
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">{maintenanceActive ? "Fin Maintenance" : "Maintenance"}</span>
+              </button>
+              <button
+                onClick={() => navigate("/admin/historique")}
+                title="Historique des tours"
+                className="p-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[#888] hover:text-white transition-colors"
+              >
+                <History className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => navigate("/")}
                 className="px-3 py-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 text-white"
@@ -1199,6 +1251,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               currentTime={currentTime}
               color={BIKE1_COLOR}
               lapRecords={state.lapRecords}
+              maintenance={state.maintenance}
               {...bike1Ops}
             />
           </div>
@@ -1210,6 +1263,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               currentTime={currentTime}
               color={BIKE2_COLOR}
               lapRecords={state.lapRecords}
+              maintenance={state.maintenance}
               {...bike2Ops}
             />
           </div>
@@ -1221,6 +1275,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               currentTime={currentTime}
               color={BIKE3_COLOR}
               lapRecords={state.lapRecords}
+              maintenance={state.maintenance}
               {...bike3Ops}
             />
           </div>

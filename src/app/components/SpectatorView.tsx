@@ -47,11 +47,11 @@ export function SpectatorView() {
   }, []);
 
   // Real map progress: elapsed / avg lap time
-  const _bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).slice(-10);
+  const _bike1RecentLaps = state.lapRecords.filter((r) => r.bikeId === 1).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const _bike1AvgLap = _bike1RecentLaps.length > 0 ? _bike1RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike1RecentLaps.length : 0;
-  const _bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).slice(-10);
+  const _bike2RecentLaps = state.lapRecords.filter((r) => r.bikeId === 2).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const _bike2AvgLap = _bike2RecentLaps.length > 0 ? _bike2RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike2RecentLaps.length : 0;
-  const _bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).slice(-10);
+  const _bike3RecentLaps = state.lapRecords.filter((r) => r.bikeId === 3).sort((a, b) => a.timestamp - b.timestamp).slice(-10);
   const _bike3AvgLap = _bike3RecentLaps.length > 0 ? _bike3RecentLaps.reduce((s, r) => s + r.lapTime, 0) / _bike3RecentLaps.length : 0;
   const _bike1Elapsed = state.bike1.lapStartTime !== null ? currentTime - state.bike1.lapStartTime : 0;
   const _bike2Elapsed = state.bike2.lapStartTime !== null ? currentTime - state.bike2.lapStartTime : 0;
@@ -162,6 +162,14 @@ export function SpectatorView() {
 
   return (
     <div className="h-dvh md:h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333] flex flex-col">
+      {/* Maintenance Banner */}
+      {state.maintenance?.active && (
+        <div className="bg-[#f97316] text-black text-center py-1.5 px-4 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0 animate-pulse">
+          <span>⚠</span>
+          <span>Course en pause — incident technique en cours</span>
+          <span>⚠</span>
+        </div>
+      )}
       {/* Top Timing Bar */}
       <header className="bg-[#111] border-b border-[#222] sticky top-0 z-10">
         {/* Mobile header */}
