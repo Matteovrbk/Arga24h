@@ -106,7 +106,7 @@ function getPositionOnCircuit(progress: number): LatLngExpression {
   ];
 }
 
-// Composant pour empêcher le zoom/scroll involontaire
+// Composant pour empêcher le zoom/scroll involontaire + fix taille conteneur caché
 function MapConfig() {
   const map = useMap();
   useEffect(() => {
@@ -116,6 +116,16 @@ function MapConfig() {
     map.doubleClickZoom.disable();
     map.boxZoom.disable();
     map.keyboard.disable();
+
+    // Fix Leaflet: quand le conteneur passe de hidden à visible,
+    // les tuiles ne se chargent pas car la taille initiale était 0x0.
+    // ResizeObserver détecte le changement et force le recalcul.
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [map]);
   return null;
 }
