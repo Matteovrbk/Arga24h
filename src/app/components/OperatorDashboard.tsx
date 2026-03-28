@@ -12,6 +12,8 @@ import {
   X,
   MessageSquare,
   Trash2,
+  Bell,
+  BellOff,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -116,6 +118,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const [selectedScoutHistory, setSelectedScoutHistory] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [lapNotifEnabled, setLapNotifEnabled] = useState(true);
   // Inline lap-time editor: stores the timestamp of the record being edited + draft value
   const [editingLapTs, setEditingLapTs] = useState<number | null>(null);
   const [editingLapDraft, setEditingLapDraft] = useState("");
@@ -231,14 +234,16 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       const isTooFast = lapTime < LAP_VALIDATION_THRESHOLDS.tooFastSeconds;
       const isTooSlow = lapTime > LAP_VALIDATION_THRESHOLDS.tooSlowSeconds;
 
-      if (isTooFast) {
-        toast.warning(`Tour très rapide (${formatTimeFull(lapTime)}) !`, {
-          description: "Vérifiez le comptage — tour enregistré",
-        });
-      } else if (isTooSlow) {
-        toast.warning(`Tour très lent (${formatTimeFull(lapTime)})`, {
-          description: "Tour enregistré — vérifiez le cycliste",
-        });
+      if (lapNotifEnabled) {
+        if (isTooFast) {
+          toast.warning(`Tour très rapide (${formatTimeFull(lapTime)}) !`, {
+            description: "Vérifiez le comptage — tour enregistré",
+          });
+        } else if (isTooSlow) {
+          toast.warning(`Tour très lent (${formatTimeFull(lapTime)})`, {
+            description: "Tour enregistré — vérifiez le cycliste",
+          });
+        }
       }
 
       if (soundEnabled) {
@@ -311,7 +316,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       else if (bikeId === 2) setBike2MapPos(0);
       else setBike3MapPos(0);
 
-      if (scout && !isTooFast && !isTooSlow) {
+      if (lapNotifEnabled && scout && !isTooFast && !isTooSlow) {
         toast(`Tour: ${formatTimeFull(lapTime)}`, {
           description: `${scout.name} - ${bikeName(bikeId)}`,
         });
@@ -331,10 +336,12 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         if (lapTime > 5) {
           isTooFast = lapTime < LAP_VALIDATION_THRESHOLDS.tooFastSeconds;
           isTooSlow = lapTime > LAP_VALIDATION_THRESHOLDS.tooSlowSeconds;
-          if (isTooFast) {
-            toast.warning(`Tour très rapide au relais (${formatTimeFull(lapTime)}) !`, { description: "Tour enregistré" });
-          } else if (isTooSlow) {
-            toast.warning(`Tour très lent au relais (${formatTimeFull(lapTime)})`, { description: "Tour enregistré" });
+          if (lapNotifEnabled) {
+            if (isTooFast) {
+              toast.warning(`Tour très rapide au relais (${formatTimeFull(lapTime)}) !`, { description: "Tour enregistré" });
+            } else if (isTooSlow) {
+              toast.warning(`Tour très lent au relais (${formatTimeFull(lapTime)})`, { description: "Tour enregistré" });
+            }
           }
           if (soundEnabled) {
             if (isTooFast || isTooSlow) playBeep(300, 300);
@@ -1076,6 +1083,13 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 className={`p-1.5 border rounded transition-colors ${soundEnabled ? "bg-[#22c55e]/20 border-[#22c55e]/50 text-[#22c55e]" : "bg-[#222] border-[#333] text-[#888]"}`}
               >
                 {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setLapNotifEnabled(!lapNotifEnabled)}
+                title={lapNotifEnabled ? "Notifications activées" : "Notifications désactivées"}
+                className={`p-1.5 border rounded transition-colors ${lapNotifEnabled ? "bg-[#eab308]/20 border-[#eab308]/50 text-[#eab308]" : "bg-[#222] border-[#333] text-[#888]"}`}
+              >
+                {lapNotifEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => setShowCharts(!showCharts)}
