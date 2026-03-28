@@ -119,10 +119,14 @@ function MapConfig() {
 
     // Fix Leaflet: quand le conteneur passe de hidden à visible,
     // les tuiles ne se chargent pas car la taille initiale était 0x0.
-    // ResizeObserver détecte le changement et force le recalcul.
+    // ResizeObserver détecte le changement et force le recalcul + recentrage.
     const container = map.getContainer();
     const observer = new ResizeObserver(() => {
       map.invalidateSize();
+      // Recentrer la carte après le recalcul de taille —
+      // sans ça, le centre reste calculé sur l'ancienne taille (0x0)
+      // et le circuit apparaît décalé sur mobile.
+      map.setView(MAP_CENTER, map.getZoom(), { animate: false });
     });
     observer.observe(container);
     return () => observer.disconnect();
