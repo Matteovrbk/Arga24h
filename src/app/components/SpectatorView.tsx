@@ -410,13 +410,13 @@ export function SpectatorView() {
           </button>
 
           {/* Mini Track Map in Left Column */}
-          <div className={`${showMobileExtra ? "flex" : "hidden"} md:flex md:flex-1 flex-col min-h-0 border-b border-[#222]`}>
+          <div className={`${showMobileExtra ? "flex" : "hidden"} md:flex md:flex-1 flex-col min-h-0 border-b border-[#222] max-h-[260px] md:max-h-none`}>
             <div className="h-[30px] bg-[#111] flex items-center px-3 border-b border-[#222] flex-shrink-0">
               <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">
                 Suivi GPS
               </span>
             </div>
-            <div className="p-4 bg-[#0a0a0a] flex items-center justify-center relative h-[200px] md:flex-1 md:min-h-[250px]">
+            <div className="p-4 bg-[#0a0a0a] flex items-center justify-center relative h-[200px] md:flex-1 md:min-h-[250px] overflow-hidden">
               <div className="absolute inset-0 opacity-20 pointer-events-none"
                    style={{ backgroundImage: "radial-gradient(#333 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
               <div className="relative z-10 w-full">
