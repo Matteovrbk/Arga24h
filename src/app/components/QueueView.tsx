@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { useSharedState } from "./useSharedState";
 import {
   bikeName,
@@ -56,7 +57,8 @@ function buildQueueEntries(
 
   if (bike.currentRiderId && bike.lapStartTime) {
     const elapsed = now - bike.lapStartTime;
-    const remaining = Math.max(0, avg - elapsed);
+    const lapsRemaining = bike.currentRiderLapsRemaining ?? 1;
+    const remaining = Math.max(0, lapsRemaining * avg - elapsed);
     remainingMs = remaining * 1000;
 
     const scout = scouts.find((s) => s.id === bike.currentRiderId);
@@ -64,7 +66,7 @@ function buildQueueEntries(
       scoutId: bike.currentRiderId,
       scoutName: scout?.name ?? bike.currentRiderId,
       troupe: scout?.troupe ?? "",
-      plannedLaps: 1,
+      plannedLaps: lapsRemaining,
       waitMs: 0,
       expectedStartTs: bike.lapStartTime * 1000,
       elapsedSec: elapsed,
@@ -140,6 +142,11 @@ function BikeQueueCard({ bikeId, state, now }: BikeQueueCardProps) {
         <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-[#333]">
           <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
             <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-[#888]">En cours</span>
+            {current.plannedLaps > 0 && (
+              <span className="text-[9px] sm:text-[10px] font-['Roboto_Mono'] font-bold text-[#eab308]">
+                {current.plannedLaps} tour{current.plannedLaps !== 1 ? "s" : ""} restant{current.plannedLaps !== 1 ? "s" : ""}
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -227,6 +234,7 @@ function BikeQueueCard({ bikeId, state, now }: BikeQueueCardProps) {
 
 export function QueueView() {
   const { state } = useSharedState(true);
+  const navigate = useNavigate();
   const now = useNow(1000);
 
   // Event countdown / elapsed
@@ -239,8 +247,16 @@ export function QueueView() {
       {/* Top bar */}
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b border-[#222] bg-[#111] gap-1 sm:gap-0">
         <div>
-          <div className="font-bold text-white text-sm sm:text-base">
-            {state.eventConfig?.eventName ?? "24H Vélo"}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/")}
+              className="text-[#666] hover:text-white transition-colors text-[10px] uppercase tracking-widest"
+            >
+              ← Retour
+            </button>
+            <span className="font-bold text-white text-sm sm:text-base">
+              {state.eventConfig?.eventName ?? "24H Vélo"}
+            </span>
           </div>
           <div className="text-[10px] sm:text-[11px] text-[#888] font-['Roboto_Mono']">
             {state.raceStarted ? (

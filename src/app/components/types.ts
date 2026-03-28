@@ -28,6 +28,7 @@ export interface BikeState {
   lapStartTime: number | null;
   totalLaps: number;
   queuePlannedLaps: number[]; // planned laps per queue entry (parallel to queue)
+  currentRiderLapsRemaining: number; // tours restants pour le cycliste actif
 }
 
 export interface EventConfig {
@@ -69,6 +70,7 @@ export const INITIAL_BIKE_STATE: BikeState = {
   lapStartTime: null,
   totalLaps: 0,
   queuePlannedLaps: [],
+  currentRiderLapsRemaining: 0,
 };
 
 export const INITIAL_SCOUTS: Scout[] = [];

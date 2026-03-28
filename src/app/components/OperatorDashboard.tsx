@@ -89,7 +89,7 @@ export function OperatorDashboard() {
 // ── Main dashboard ─────────────────────────────────────────────
 function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const { state, updateState } = useSharedState();
-  const { messages: chatMessages, deleteMessage, clearAllMessages } = useSpectatorChat();
+  const { messages: chatMessages, deleteMessage, clearAllMessages, suspended: chatSuspended, setSuspended: setChatSuspended } = useSpectatorChat();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos, setBike1MapPos] = useState(0);
@@ -206,7 +206,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
       const bike = state[bikeKey];
       if (bike.queue.length === 0) return;
       const [nextId, ...rest] = bike.queue;
-      const [, ...restLaps] = bike.queuePlannedLaps;
+      const [firstLaps, ...restLaps] = bike.queuePlannedLaps;
       updateState((prev) => ({
         ...prev,
         [bikeKey]: {
@@ -215,6 +215,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           queue: rest,
           queuePlannedLaps: restLaps,
           lapStartTime: Date.now() / 1000,
+          currentRiderLapsRemaining: firstLaps ?? 1,
         },
       }));
       const scout = state.scouts.find((s) => s.id === nextId);
@@ -276,6 +277,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             ...prev[bikeKey],
             lapStartTime: Date.now() / 1000,
             totalLaps: prev[bikeKey].totalLaps + 1,
+            currentRiderLapsRemaining: Math.max(0, prev[bikeKey].currentRiderLapsRemaining - 1),
           },
           lapRecords: scout
             ? [
@@ -371,7 +373,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
         if (currentBike.queue.length > 0) {
           const [nextId, ...rest] = currentBike.queue;
-          const [, ...restLaps] = currentBike.queuePlannedLaps;
+          const [nextLaps, ...restLaps] = currentBike.queuePlannedLaps;
           const nextScout = prev.scouts.find((s) => s.id === nextId);
           if (nextScout) {
             toast.success(`${nextScout.name} prend le relais sur ${bikeName(bikeId)}`);
@@ -385,6 +387,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               queuePlannedLaps: restLaps,
               lapStartTime: Date.now() / 1000,
               totalLaps: shouldCountLap ? currentBike.totalLaps + 1 : currentBike.totalLaps,
+              currentRiderLapsRemaining: nextLaps ?? 1,
             },
             lapRecords: newLapRecord ? [...prev.lapRecords, newLapRecord] : prev.lapRecords,
             lapFlags: shouldCountLap
@@ -401,6 +404,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               currentRiderId: null,
               lapStartTime: null,
               totalLaps: shouldCountLap ? currentBike.totalLaps + 1 : currentBike.totalLaps,
+              currentRiderLapsRemaining: 0,
             },
             lapRecords: newLapRecord ? [...prev.lapRecords, newLapRecord] : prev.lapRecords,
             lapFlags: shouldCountLap
@@ -451,6 +455,15 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         laps[index] = lapsCount;
         return { ...prev, [bikeKey]: { ...prev[bikeKey], queuePlannedLaps: laps } };
       });
+    },
+    onSetCurrentRiderLaps: (laps: number) => {
+      updateState((prev) => ({
+        ...prev,
+        [bikeKey]: {
+          ...prev[bikeKey],
+          currentRiderLapsRemaining: Math.max(0, laps),
+        },
+      }));
     },
   });
 
@@ -875,22 +888,37 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             {/* Actions bar */}
             <div className="px-5 py-2 border-b border-[#222] bg-[#0d0d0d] flex items-center justify-between flex-shrink-0">
               <span className="text-[9px] text-[#666] uppercase tracking-widest font-['Roboto_Mono']">
-                Survolez un message pour le supprimer
+                {chatSuspended ? "Chat suspendu" : "Survolez un message pour le supprimer"}
               </span>
-              {chatMessages.length > 0 && (
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    if (window.confirm("Supprimer TOUS les messages du chat ?")) {
-                      clearAllMessages();
-                      toast.success("Chat vidé");
-                    }
+                    setChatSuspended(!chatSuspended);
+                    toast.success(chatSuspended ? "Chat réactivé" : "Chat suspendu");
                   }}
-                  className="px-2.5 py-1 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] rounded text-[9px] uppercase tracking-widest text-[#ef4444] hover:text-white transition-colors flex items-center gap-1.5"
+                  className={`px-2.5 py-1 border rounded text-[9px] uppercase tracking-widest transition-colors flex items-center gap-1.5 ${
+                    chatSuspended
+                      ? "bg-[#052e16] hover:bg-[#14532d] border-[#14532d] text-[#22c55e] hover:text-white"
+                      : "bg-[#451a03] hover:bg-[#7c2d12] border-[#7c2d12] text-[#f97316] hover:text-white"
+                  }`}
                 >
-                  <Trash2 className="w-3 h-3" />
-                  Tout vider
+                  {chatSuspended ? "Réactiver" : "Suspendre"}
                 </button>
-              )}
+                {chatMessages.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Supprimer TOUS les messages du chat ?")) {
+                        clearAllMessages();
+                        toast.success("Chat vidé");
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-[#450a0a] hover:bg-[#7f1d1d] border border-[#7f1d1d] rounded text-[9px] uppercase tracking-widest text-[#ef4444] hover:text-white transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Tout vider
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Messages list */}

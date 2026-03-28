@@ -14,14 +14,15 @@ import {
   bikeColor as getBikeColor,
 } from "./types";
 import type { LapRecord } from "./types";
-import { ArrowLeft, Clock, Activity, Maximize, Send } from "lucide-react";
+import { ArrowLeft, Clock, Activity, Maximize, Send, Bell, BellOff } from "lucide-react";
+import { useIsMobile } from "./ui/use-mobile";
 import QRCode from "react-qr-code";
 
 const SHARE_URL = "https://www.ungapura24h.xyz/";
 
 export function SpectatorView() {
   const { state } = useSharedState(true);
-  const { messages: chatMessages, sendMessage, isConnected: chatConnected } = useSpectatorChat();
+  const { messages: chatMessages, sendMessage, isConnected: chatConnected, suspended: chatSuspended } = useSpectatorChat();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(Date.now() / 1000);
   const [bike1MapPos] = useState(0);
@@ -35,6 +36,9 @@ export function SpectatorView() {
   const [chatText, setChatText] = useState("");
   const [chatAuthor, setChatAuthor] = useState(() => sessionStorage.getItem("sp51_chat_name") || "");
   const [showQR, setShowQR] = useState(false);
+  const isMobile = useIsMobile();
+  const [flashEnabled, setFlashEnabled] = useState(true);
+  const [showMobileExtra, setShowMobileExtra] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,9 +65,13 @@ export function SpectatorView() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // Flash new laps
+  // Flash new laps (disabled on mobile)
   const [lastLapCount, setLastLapCount] = useState(state.lapRecords.length);
   useEffect(() => {
+    if (isMobile || !flashEnabled) {
+      setLastLapCount(state.lapRecords.length);
+      return;
+    }
     if (state.lapRecords.length > lastLapCount) {
       const newLap = state.lapRecords[state.lapRecords.length - 1];
       setFlashLap(newLap);
@@ -72,7 +80,7 @@ export function SpectatorView() {
       return () => clearTimeout(t);
     }
     setLastLapCount(state.lapRecords.length);
-  }, [state.lapRecords.length, state.lapRecords]);
+  }, [state.lapRecords.length, state.lapRecords, isMobile, flashEnabled]);
 
   // Unread chat counter
   useEffect(() => {
@@ -157,19 +165,32 @@ export function SpectatorView() {
       {/* Top Timing Bar */}
       <header className="bg-[#111] border-b border-[#222] sticky top-0 z-10">
         {/* Mobile header */}
-        <div className="flex md:hidden items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-[#e11d48]" />
-            <span className="text-[11px] font-bold text-[#fff] uppercase">24hSaintPaul</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="font-['Roboto_Mono'] text-[#fff] text-xs">
-              {String(eventHours).padStart(2, "0")}:{String(eventMins).padStart(2, "0")}:{String(eventSecs).padStart(2, "0")}
+        <div className="flex md:hidden flex-col px-3 py-2 gap-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-[#e11d48]" />
+              <span className="text-[11px] font-bold text-[#fff] uppercase">24hSaintPaul</span>
             </div>
-            <div className="font-['Roboto_Mono'] text-[#22c55e] text-xs">{totalLaps} T</div>
-            {remaining !== null && remaining > 0 && (
-              <div className="font-['Roboto_Mono'] text-[#e11d48] text-xs">{formatDuration(remaining)}</div>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="font-['Roboto_Mono'] text-[#fff] text-xs">
+                {String(eventHours).padStart(2, "0")}:{String(eventMins).padStart(2, "0")}:{String(eventSecs).padStart(2, "0")}
+              </div>
+              <div className="font-['Roboto_Mono'] text-[#22c55e] text-xs">{totalLaps} T</div>
+              {remaining !== null && remaining > 0 && (
+                <div className="font-['Roboto_Mono'] text-[#e11d48] text-xs">{formatDuration(remaining)}</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="font-['Roboto_Mono'] text-[#22c55e] text-[10px]">
+              {(totalLaps * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1)} km parcourus
+            </div>
+            <button
+              onClick={() => navigate("/attente")}
+              className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded border border-[#333] text-[#aaa] active:bg-[#222] transition-colors"
+            >
+              File d'attente →
+            </button>
           </div>
         </div>
         {/* Desktop header */}
@@ -234,6 +255,14 @@ export function SpectatorView() {
             )}
             <div className="w-px h-4 bg-[#333]" />
             <button
+              onClick={() => setFlashEnabled((v) => !v)}
+              className="transition-colors p-1"
+              style={{ color: flashEnabled ? "#22c55e" : "#555" }}
+              title={flashEnabled ? "Désactiver les notifications" : "Activer les notifications"}
+            >
+              {flashEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            </button>
+            <button
               onClick={toggleFullscreen}
               className="text-[#666] hover:text-[#fff] transition-colors p-1"
               title="Plein écran (F11)"
@@ -254,10 +283,10 @@ export function SpectatorView() {
         </div>
       )}
 
-      {/* Flash Notification */}
-      {flashLap && (
-        <div className="absolute top-14 md:top-16 right-2 md:right-4 left-2 md:left-auto z-50 animate-in fade-in slide-in-from-right-8 duration-300">
-          <div className="bg-[#111] border border-[#333] p-3 shadow-2xl md:min-w-[300px] flex items-stretch">
+      {/* Flash Notification — desktop only, dismissable */}
+      {!isMobile && flashEnabled && flashLap && (
+        <div className="absolute top-16 right-4 z-50 animate-in fade-in slide-in-from-right-8 duration-300">
+          <div className="bg-[#111] border border-[#333] p-3 shadow-2xl min-w-[300px] flex items-stretch">
             <div
               className="w-1.5 flex-shrink-0"
               style={{ backgroundColor: getBikeColor(flashLap.bikeId as 1 | 2 | 3) }}
@@ -271,6 +300,12 @@ export function SpectatorView() {
                 </span>
               </div>
             </div>
+            <button
+              onClick={() => setFlashLap(null)}
+              className="ml-2 text-[#555] hover:text-[#fff] transition-colors self-start text-xs leading-none"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
@@ -366,8 +401,16 @@ export function SpectatorView() {
             </div>
           </div>
 
-          {/* Mini Track Map in Left Column — hidden on mobile */}
-          <div className="hidden md:flex flex-1 flex-col min-h-0 border-b border-[#222]">
+          {/* Mobile: toggle carte & stats */}
+          <button
+            onClick={() => setShowMobileExtra((v) => !v)}
+            className="flex md:hidden items-center justify-center gap-2 px-3 py-2.5 border-b border-[#222] bg-[#0d0d0d] text-[10px] text-[#888] uppercase tracking-widest font-semibold active:bg-[#111] transition-colors"
+          >
+            {showMobileExtra ? "Masquer carte & stats \u25B2" : "Voir carte & stats \u25BC"}
+          </button>
+
+          {/* Mini Track Map in Left Column */}
+          <div className={`${showMobileExtra ? "flex" : "hidden"} md:flex flex-1 flex-col min-h-0 border-b border-[#222]`}>
             <div className="h-[30px] bg-[#111] flex items-center px-3 border-b border-[#222] flex-shrink-0">
               <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">
                 Suivi GPS
@@ -393,8 +436,8 @@ export function SpectatorView() {
             </div>
           </div>
 
-          {/* Pace Predictions — hidden on mobile */}
-          <div className="hidden md:block p-3 border-b border-[#222] bg-[#080808]">
+          {/* Pace Predictions */}
+          <div className={`${showMobileExtra ? "block" : "hidden"} md:block p-3 border-b border-[#222] bg-[#080808]`}>
             <div className="text-[10px] text-[#888] uppercase tracking-widest font-semibold mb-2">
               Prédictions (rythme actuel)
             </div>
@@ -432,8 +475,8 @@ export function SpectatorView() {
             })()}
           </div>
 
-          {/* Share URL + QR — hidden on mobile */}
-          <div className="hidden md:block p-3 bg-[#080808] border-t border-[#222]">
+          {/* Share URL + QR */}
+          <div className={`${showMobileExtra ? "block" : "hidden"} md:block p-3 bg-[#080808] border-t border-[#222]`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">Partager</span>
               <button
@@ -515,7 +558,7 @@ export function SpectatorView() {
                     return (
                       <div
                         key={entry.scoutId}
-                        className={`grid grid-cols-[30px_1fr_55px_80px_80px_55px] items-center border-b border-[#1a1a1a] transition-colors ${
+                        className={`grid grid-cols-[24px_1fr_60px_40px] md:grid-cols-[30px_1fr_55px_80px_80px_55px] items-center border-b border-[#1a1a1a] transition-colors ${
                           i === 0 ? "bg-[#0d0d0d]" : "hover:bg-[#0a0a0a]"
                         }`}
                         style={i === 0 ? { boxShadow: `inset 3px 0 0 ${bColor}` } : {}}
@@ -537,7 +580,7 @@ export function SpectatorView() {
                             <span className="font-normal opacity-60">{entry.name.substring(3)}</span>
                           </span>
                           {i === 0 && (
-                            <span className="text-[8px] bg-[#ffd700] text-black px-1 py-0.5 rounded font-bold uppercase tracking-widest ml-1 flex-shrink-0 animate-pulse">
+                            <span className="hidden md:inline text-[8px] bg-[#ffd700] text-black px-1 py-0.5 rounded font-bold uppercase tracking-widest ml-1 flex-shrink-0 animate-pulse">
                               LEADER
                             </span>
                           )}
@@ -598,33 +641,41 @@ export function SpectatorView() {
                 <div ref={chatEndRef} />
               </div>
               <div className="border-t border-[#222] p-3 space-y-2 bg-[#080808]">
-                <input
-                  value={chatAuthor}
-                  onChange={(e) => { setChatAuthor(e.target.value); sessionStorage.setItem("sp51_chat_name", e.target.value); }}
-                  placeholder="Ton prénom..."
-                  maxLength={30}
-                  className="w-full bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#e2a03f]"
-                />
-                <form
-                  onSubmit={(e) => { e.preventDefault(); sendMessage(chatText, chatAuthor || "Spectateur"); setChatText(""); }}
-                  className="flex gap-2"
-                >
-                  <input
-                    value={chatText}
-                    onChange={(e) => setChatText(e.target.value)}
-                    placeholder={chatConnected ? "Écris un message..." : "Chat hors-ligne"}
-                    maxLength={200}
-                    disabled={!chatConnected}
-                    className="flex-1 bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#3b82f6] disabled:opacity-40"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!chatConnected || !chatText.trim()}
-                    className="px-3 py-1.5 bg-[#3b82f6] hover:bg-[#2563eb] rounded text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1 text-[11px]"
-                  >
-                    <Send className="w-3 h-3" />
-                  </button>
-                </form>
+                {chatSuspended ? (
+                  <div className="text-center text-[#f97316] text-[10px] uppercase tracking-widest font-bold py-2">
+                    Chat suspendu par les organisateurs
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={chatAuthor}
+                      onChange={(e) => { setChatAuthor(e.target.value); sessionStorage.setItem("sp51_chat_name", e.target.value); }}
+                      placeholder="Ton prénom..."
+                      maxLength={30}
+                      className="w-full bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#e2a03f]"
+                    />
+                    <form
+                      onSubmit={(e) => { e.preventDefault(); sendMessage(chatText, chatAuthor || "Spectateur"); setChatText(""); }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        value={chatText}
+                        onChange={(e) => setChatText(e.target.value)}
+                        placeholder={chatConnected ? "Écris un message..." : "Chat hors-ligne"}
+                        maxLength={200}
+                        disabled={!chatConnected}
+                        className="flex-1 bg-[#111] border border-[#222] rounded px-3 py-1.5 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#3b82f6] disabled:opacity-40"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatConnected || !chatText.trim()}
+                        className="px-3 py-1.5 bg-[#3b82f6] hover:bg-[#2563eb] rounded text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1 text-[11px]"
+                      >
+                        <Send className="w-3 h-3" />
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
             </div>
           )}

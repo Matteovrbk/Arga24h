@@ -24,6 +24,7 @@ interface BikeQueueProps {
   onRemoveFromQueue: (index: number) => void;
   onMoveInQueue: (index: number, direction: "up" | "down") => void;
   onSetPlannedLaps: (index: number, laps: number) => void;
+  onSetCurrentRiderLaps: (laps: number) => void;
   currentTime: number;
   color: string;
   lapRecords: LapRecord[];
@@ -40,6 +41,7 @@ export function BikeQueue({
   onRemoveFromQueue,
   onMoveInQueue,
   onSetPlannedLaps,
+  onSetCurrentRiderLaps,
   currentTime,
   color,
   lapRecords,
@@ -103,8 +105,9 @@ export function BikeQueue({
     for (let i = 0; i < index; i++) {
       totalLapsBefore += (bikeState.queuePlannedLaps[i] ?? 1);
     }
+    const lapsRemaining = bikeState.currentRiderLapsRemaining ?? 0;
     const currentRiderRemaining = currentRider
-      ? (elapsedTime > 0 ? Math.max(0, avgLapTime - elapsedTime) : avgLapTime)
+      ? Math.max(0, lapsRemaining * avgLapTime - elapsedTime)
       : 0;
     return totalLapsBefore * avgLapTime + currentRiderRemaining;
   };
@@ -175,12 +178,35 @@ export function BikeQueue({
           )}
 
           {currentRider && (
-            <div className="flex flex-col items-end">
-              <div className="text-[10px] text-[#666] uppercase tracking-widest mb-1">
-                Chrono en cours
+            <div className="flex flex-col items-end gap-2">
+              <div>
+                <div className="text-[10px] text-[#666] uppercase tracking-widest mb-1 text-right">
+                  Chrono en cours
+                </div>
+                <div className="flex items-center gap-1 text-2xl font-bold font-['Roboto_Mono'] tabular-nums leading-none text-[#eab308]">
+                  {formatTimeShort(elapsedTime)}
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-2xl font-bold font-['Roboto_Mono'] tabular-nums leading-none text-[#eab308]">
-                {formatTimeShort(elapsedTime)}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] text-[#666] uppercase tracking-widest">Tours restants</span>
+                <div className="flex items-center gap-1 bg-[#0a0a0a] border border-[#333] rounded px-1 py-0.5">
+                  <button
+                    onClick={() => onSetCurrentRiderLaps(Math.max(0, bikeState.currentRiderLapsRemaining - 1))}
+                    disabled={bikeState.currentRiderLapsRemaining <= 0}
+                    className="p-0.5 text-[#888] hover:text-white disabled:opacity-20 transition-colors"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className={`text-[11px] font-['Roboto_Mono'] font-bold w-5 text-center ${bikeState.currentRiderLapsRemaining === 0 ? "text-[#ef4444]" : "text-white"}`}>
+                    {bikeState.currentRiderLapsRemaining}
+                  </span>
+                  <button
+                    onClick={() => onSetCurrentRiderLaps(bikeState.currentRiderLapsRemaining + 1)}
+                    className="p-0.5 text-[#888] hover:text-white transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           )}
