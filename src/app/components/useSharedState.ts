@@ -183,7 +183,7 @@ export function useSharedState(readonly = false) {
     const handler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setState(JSON.parse(e.newValue));
+          setState(mergeWithDefaults(JSON.parse(e.newValue)));
         } catch {}
       }
     };
