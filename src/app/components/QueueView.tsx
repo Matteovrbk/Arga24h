@@ -24,7 +24,7 @@ function useNow(intervalMs = 1000) {
 /** Average lap time in seconds from the last N records */
 function avgLapTime(lapRecords: AppState["lapRecords"], bikeId: 1 | 2 | 3, n = 10): number {
   const relevant = lapRecords
-    .filter((r) => r.bikeId === bikeId)
+    .filter((r) => r.bikeId === bikeId && r.lapTime >= 195)
     .sort((a, b) => a.timestamp - b.timestamp)
     .slice(-n);
   if (relevant.length === 0) return 600; // default 10 min
