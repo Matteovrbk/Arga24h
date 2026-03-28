@@ -234,20 +234,6 @@ export function useSharedState(readonly = false) {
         diffAndWrite(db, prev, next);
         setTimeout(() => {
           isWritingRef.current = false;
-          // One-time read after the echo-ignore window to catch any concurrent
-          // updates from the other PC that arrived while we were ignoring
-          if (db) {
-            get(ref(db, FIREBASE_PATH))
-              .then((snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                  const merged = mergeWithDefaults(data);
-                  setState(merged);
-                  saveState(merged);
-                }
-              })
-              .catch(() => {});
-          }
         }, 200);
       }
       return next;
