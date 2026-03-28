@@ -31,6 +31,7 @@ export function Leaderboard({ lapRecords, scouts }: LeaderboardProps) {
   };
 
   const filtered = lapRecords.filter((r) => {
+    if (r.lapTime < 195) return false; // sub 3:15 physiquement impossible
     if (filter === "bike1") return r.bikeId === 1;
     if (filter === "bike2") return r.bikeId === 2;
     if (filter === "bike3") return r.bikeId === 3;
