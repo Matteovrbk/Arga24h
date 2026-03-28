@@ -107,7 +107,7 @@ export function useSharedState(readonly = false) {
 
   // For spectator without Firebase: poll localStorage every 500ms
   useEffect(() => {
-    if (!readonly || !db) return;
+    if (!readonly || db) return;
     const interval = setInterval(() => {
       setState(loadState());
     }, 500);
@@ -116,7 +116,10 @@ export function useSharedState(readonly = false) {
 
   const updateState = useCallback((updater: (prev: AppState) => AppState) => {
     setState((prev) => {
-      const next = updater(prev);
+      let next = updater(prev);
+      if (next.commentary.length > 100) {
+        next = { ...next, commentary: next.commentary.slice(-100) };
+      }
       saveState(next);
       // Broadcast to same-device tabs
       try {

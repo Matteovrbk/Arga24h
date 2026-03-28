@@ -28,7 +28,7 @@ export function SpectatorView() {
   const [bike2MapPos] = useState(0);
   const [bike3MapPos] = useState(0);
   const [flashLap, setFlashLap] = useState<LapRecord | null>(null);
-  const [spectatorFilter, setSpectatorFilter] = useState<"all" | "bike1" | "bike2" | "bike3" | "Ungava" | "Argapura">("all");
+  const [spectatorFilter, setSpectatorFilter] = useState<"all" | "bike1" | "bike2" | "bike3" | "Ungava" | "Argapura" | "CuPiDon">("all");
   const [rightTab, setRightTab] = useState<"leaderboard" | "chat">("leaderboard");
   const [unreadChat, setUnreadChat] = useState(0);
   const [lastSeenChatCount, setLastSeenChatCount] = useState(0);
@@ -117,13 +117,14 @@ export function SpectatorView() {
     { key: "bike3" as const,    label: "VPi",        color: BIKE3_COLOR },
     { key: "Ungava" as const,   label: "UNGAVA",     color: "#3b82f6"   },
     { key: "Argapura" as const, label: "ARGAPURA",   color: "#ef4444"   },
+    { key: "CuPiDon" as const,  label: "CUPIDON",    color: "#a855f7"   },
   ];
 
   const filteredRecords = state.lapRecords.filter((r) => {
     if (spectatorFilter === "bike1") return r.bikeId === 1;
     if (spectatorFilter === "bike2") return r.bikeId === 2;
     if (spectatorFilter === "bike3") return r.bikeId === 3;
-    if (spectatorFilter === "Ungava" || spectatorFilter === "Argapura") return r.troupe === spectatorFilter;
+    if (spectatorFilter === "Ungava" || spectatorFilter === "Argapura" || spectatorFilter === "CuPiDon") return r.troupe === spectatorFilter;
     return true;
   });
 
@@ -152,75 +153,94 @@ export function SpectatorView() {
   };
 
   return (
-    <div className="h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333] flex flex-col">
+    <div className="h-dvh md:h-screen bg-[#050505] text-[#eee] overflow-hidden font-['Inter'] selection:bg-[#333] flex flex-col">
       {/* Top Timing Bar */}
-      <header className="h-[40px] bg-[#111] border-b border-[#222] flex items-center justify-between px-4 sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate("/admin")}
-            className="text-[#666] hover:text-[#fff] transition-colors flex items-center gap-1 text-[10px] uppercase tracking-widest"
-          >
-            <ArrowLeft className="w-3 h-3" />
-            Admin
-          </button>
-          <div className="w-px h-4 bg-[#333]" />
-          <button
-            onClick={() => navigate("/attente")}
-            className="text-[#666] hover:text-[#fff] transition-colors text-[10px] uppercase tracking-widest"
-          >
-            File d'attente
-          </button>
-          <div className="w-px h-4 bg-[#333]" />
+      <header className="bg-[#111] border-b border-[#222] sticky top-0 z-10">
+        {/* Mobile header */}
+        <div className="flex md:hidden items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-[#e11d48]" />
-            <span className="text-[11px] font-bold tracking-widest text-[#fff] uppercase">
-              24hSaintPaul — Chronométrage Direct
-            </span>
+            <Activity className="w-3.5 h-3.5 text-[#e11d48]" />
+            <span className="text-[11px] font-bold text-[#fff] uppercase">24hSaintPaul</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="font-['Roboto_Mono'] text-[#fff] text-xs">
+              {String(eventHours).padStart(2, "0")}:{String(eventMins).padStart(2, "0")}:{String(eventSecs).padStart(2, "0")}
+            </div>
+            <div className="font-['Roboto_Mono'] text-[#22c55e] text-xs">{totalLaps} T</div>
+            {remaining !== null && remaining > 0 && (
+              <div className="font-['Roboto_Mono'] text-[#e11d48] text-xs">{formatDuration(remaining)}</div>
+            )}
           </div>
         </div>
+        {/* Desktop header */}
+        <div className="hidden md:flex h-[40px] items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/admin")}
+              className="text-[#666] hover:text-[#fff] transition-colors flex items-center gap-1 text-[10px] uppercase tracking-widest"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Admin
+            </button>
+            <div className="w-px h-4 bg-[#333]" />
+            <button
+              onClick={() => navigate("/attente")}
+              className="text-[#666] hover:text-[#fff] transition-colors text-[10px] uppercase tracking-widest"
+            >
+              File d'attente
+            </button>
+            <div className="w-px h-4 bg-[#333]" />
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#e11d48]" />
+              <span className="text-[11px] font-bold tracking-widest text-[#fff] uppercase">
+                24hSaintPaul — Chronométrage Direct
+              </span>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-[#666] uppercase tracking-widest">TEMPS: </span>
-            <div className="font-['Roboto_Mono'] text-[#fff] text-sm">
-              {String(eventHours).padStart(2, "0")}:
-              {String(eventMins).padStart(2, "0")}:
-              {String(eventSecs).padStart(2, "0")}
-            </div>
-          </div>
-          <div className="w-px h-4 bg-[#333]" />
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-[#666] uppercase tracking-widest">TOURS: </span>
-            <div className="font-['Roboto_Mono'] text-[#fff] text-sm">
-              {totalLaps}
-            </div>
-          </div>
-          <div className="w-px h-4 bg-[#333]" />
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-[#666] uppercase tracking-widest">DIST: </span>
-            <div className="font-['Roboto_Mono'] text-[#22c55e] text-sm">
-              {(totalLaps * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1)} km
-            </div>
-          </div>
-          {remaining !== null && remaining > 0 && (
-            <>
-              <div className="w-px h-4 bg-[#333]" />
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-[#666] uppercase tracking-widest">RESTANT: </span>
-                <div className="font-['Roboto_Mono'] text-[#e11d48] text-sm">
-                  {formatDuration(remaining)}
-                </div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[#666] uppercase tracking-widest">TEMPS: </span>
+              <div className="font-['Roboto_Mono'] text-[#fff] text-sm">
+                {String(eventHours).padStart(2, "0")}:
+                {String(eventMins).padStart(2, "0")}:
+                {String(eventSecs).padStart(2, "0")}
               </div>
-            </>
-          )}
-          <div className="w-px h-4 bg-[#333]" />
-          <button
-            onClick={toggleFullscreen}
-            className="text-[#666] hover:text-[#fff] transition-colors p-1"
-            title="Plein écran (F11)"
-          >
-            <Maximize className="w-4 h-4" />
-          </button>
+            </div>
+            <div className="w-px h-4 bg-[#333]" />
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[#666] uppercase tracking-widest">TOURS: </span>
+              <div className="font-['Roboto_Mono'] text-[#fff] text-sm">
+                {totalLaps}
+              </div>
+            </div>
+            <div className="w-px h-4 bg-[#333]" />
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[#666] uppercase tracking-widest">DIST: </span>
+              <div className="font-['Roboto_Mono'] text-[#22c55e] text-sm">
+                {(totalLaps * (state.eventConfig?.circuitLengthKm ?? 2.61)).toFixed(1)} km
+              </div>
+            </div>
+            {remaining !== null && remaining > 0 && (
+              <>
+                <div className="w-px h-4 bg-[#333]" />
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-[#666] uppercase tracking-widest">RESTANT: </span>
+                  <div className="font-['Roboto_Mono'] text-[#e11d48] text-sm">
+                    {formatDuration(remaining)}
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="w-px h-4 bg-[#333]" />
+            <button
+              onClick={toggleFullscreen}
+              className="text-[#666] hover:text-[#fff] transition-colors p-1"
+              title="Plein écran (F11)"
+            >
+              <Maximize className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -236,8 +256,8 @@ export function SpectatorView() {
 
       {/* Flash Notification */}
       {flashLap && (
-        <div className="absolute top-16 right-4 z-50 animate-in fade-in slide-in-from-right-8 duration-300">
-          <div className="bg-[#111] border border-[#333] p-3 shadow-2xl min-w-[300px] flex items-stretch">
+        <div className="absolute top-14 md:top-16 right-2 md:right-4 left-2 md:left-auto z-50 animate-in fade-in slide-in-from-right-8 duration-300">
+          <div className="bg-[#111] border border-[#333] p-3 shadow-2xl md:min-w-[300px] flex items-stretch">
             <div
               className="w-1.5 flex-shrink-0"
               style={{ backgroundColor: getBikeColor(flashLap.bikeId as 1 | 2 | 3) }}
@@ -258,7 +278,7 @@ export function SpectatorView() {
       <main className="flex-1 max-w-[1920px] mx-auto w-full flex flex-col md:flex-row overflow-hidden">
 
         {/* LEFT COLUMN: Track Status & Map */}
-        <div className="w-full md:w-[400px] flex-shrink-0 border-r border-[#222] flex flex-col bg-[#080808]">
+        <div className="w-full md:w-[400px] flex-shrink-0 border-r border-[#222] flex flex-col bg-[#080808] overflow-y-auto md:overflow-y-hidden">
           {/* Section Header */}
           <div className="h-[30px] bg-[#111] flex items-center px-3 border-b border-[#222]">
             <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold flex items-center gap-1.5">
@@ -346,8 +366,8 @@ export function SpectatorView() {
             </div>
           </div>
 
-          {/* Mini Track Map in Left Column */}
-          <div className="flex-1 flex flex-col min-h-0 border-b border-[#222]">
+          {/* Mini Track Map in Left Column — hidden on mobile */}
+          <div className="hidden md:flex flex-1 flex-col min-h-0 border-b border-[#222]">
             <div className="h-[30px] bg-[#111] flex items-center px-3 border-b border-[#222] flex-shrink-0">
               <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">
                 Suivi GPS
@@ -373,8 +393,8 @@ export function SpectatorView() {
             </div>
           </div>
 
-          {/* Pace Predictions */}
-          <div className="p-3 border-b border-[#222] bg-[#080808]">
+          {/* Pace Predictions — hidden on mobile */}
+          <div className="hidden md:block p-3 border-b border-[#222] bg-[#080808]">
             <div className="text-[10px] text-[#888] uppercase tracking-widest font-semibold mb-2">
               Prédictions (rythme actuel)
             </div>
@@ -412,8 +432,8 @@ export function SpectatorView() {
             })()}
           </div>
 
-          {/* Share URL + QR */}
-          <div className="p-3 bg-[#080808] border-t border-[#222]">
+          {/* Share URL + QR — hidden on mobile */}
+          <div className="hidden md:block p-3 bg-[#080808] border-t border-[#222]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] text-[#888] uppercase tracking-widest font-semibold">Partager</span>
               <button
@@ -452,7 +472,7 @@ export function SpectatorView() {
                 <button
                   key={f.key}
                   onClick={() => setSpectatorFilter(f.key)}
-                  className="px-2 py-0.5 text-[9px] uppercase tracking-widest font-bold rounded border transition-all"
+                  className="px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] uppercase tracking-widest font-bold rounded border transition-all"
                   style={
                     spectatorFilter === f.key
                       ? { backgroundColor: f.color, borderColor: f.color, color: "#000" }
@@ -469,12 +489,12 @@ export function SpectatorView() {
           {rightTab === "leaderboard" && (
             <>
               {/* Table Header */}
-              <div className="grid grid-cols-[30px_1fr_55px_80px_80px_55px] items-center text-[10px] uppercase tracking-widest text-[#666] bg-[#080808] border-b border-[#222] h-[28px]">
+              <div className="grid grid-cols-[24px_1fr_60px_40px] md:grid-cols-[30px_1fr_55px_80px_80px_55px] items-center text-[10px] uppercase tracking-widest text-[#666] bg-[#080808] border-b border-[#222] h-[28px]">
                 <div className="text-center">Pos</div>
                 <div className="px-2">Cycliste</div>
-                <div className="text-center">Vélo</div>
-                <div className="text-right pr-4">Meilleur</div>
-                <div className="text-right pr-4">Écart</div>
+                <div className="hidden md:block text-center">Vélo</div>
+                <div className="text-right pr-2 md:pr-4">Meilleur</div>
+                <div className="hidden md:block text-right pr-4">Écart</div>
                 <div className="text-right pr-2">Tours</div>
               </div>
 
@@ -523,21 +543,21 @@ export function SpectatorView() {
                           )}
                         </div>
 
-                        {/* Bike */}
-                        <div className="text-center py-2.5">
+                        {/* Bike — hidden on mobile */}
+                        <div className="hidden md:block text-center py-2.5">
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: bColor + "22", color: bColor }}>
                             {bikeShortLabel(entry.bikeId)}
                           </span>
                         </div>
 
                         {/* Best time */}
-                        <div className={`font-['Roboto_Mono'] text-right pr-4 py-2.5 text-[11px] ${i === 0 ? "font-bold" : ""}`}
+                        <div className={`font-['Roboto_Mono'] text-right pr-2 md:pr-4 py-2.5 text-[11px] ${i === 0 ? "font-bold" : ""}`}
                           style={{ color: podiumColor ?? "#fff" }}>
                           {formatTimeFull(entry.time)}
                         </div>
 
-                        {/* Gap */}
-                        <div className="font-['Roboto_Mono'] text-[#555] text-right pr-4 py-2.5 text-[10px]">
+                        {/* Gap — hidden on mobile */}
+                        <div className="hidden md:block font-['Roboto_Mono'] text-[#555] text-right pr-4 py-2.5 text-[10px]">
                           {i === 0 ? "\u2014" : gap}
                         </div>
 

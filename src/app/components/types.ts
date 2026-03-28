@@ -113,9 +113,14 @@ export function formatTimeFull(seconds: number) {
 }
 
 export function formatTimeShort(seconds: number) {
-  const mins = Math.floor(seconds / 60);
+  const totalMins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  if (totalMins >= 60) {
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+  return `${totalMins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
 export function formatDuration(ms: number): string {
