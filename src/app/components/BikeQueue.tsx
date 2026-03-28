@@ -73,7 +73,7 @@ export function BikeQueue({
     bikeState.lapStartTime !== null ? effectiveTime - bikeState.lapStartTime : 0;
 
   const bikeLaps = lapRecords
-    .filter((r) => r.bikeId === bikeId)
+    .filter((r) => r.bikeId === bikeId && r.lapTime >= 195)
     .sort((a, b) => a.timestamp - b.timestamp);
   const recentLaps = bikeLaps.slice(-10);
   const avgLapTime =
