@@ -133,7 +133,14 @@ function diffAndWrite(database: Database, prev: AppState, next: AppState) {
   if (next.lapFlags !== prev.lapFlags) {
     const prevKeys = new Set(Object.keys(prev.lapFlags));
     Object.entries(next.lapFlags).forEach(([k, v]) => {
-      if (!prevKeys.has(k)) updates[`${P}/lapFlags/${k}`] = v;
+      if (!prevKeys.has(k)) {
+        // Firebase rejects undefined values — strip optional fields that are undefined
+        const clean: Record<string, unknown> = {};
+        Object.entries(v).forEach(([fk, fv]) => {
+          if (fv !== undefined) clean[fk] = fv;
+        });
+        updates[`${P}/lapFlags/${k}`] = clean;
+      }
     });
     // Note: lapFlags are never deleted in the current code, so no removal needed
   }
