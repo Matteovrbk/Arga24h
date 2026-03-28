@@ -303,11 +303,11 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             ...prev.lapFlags,
             [flagKey]: {
               type: isTooFast ? "too-fast" : isTooSlow ? "too-slow" : "valid",
-              threshold: isTooFast
-                ? LAP_VALIDATION_THRESHOLDS.tooFastSeconds
+              ...(isTooFast
+                ? { threshold: LAP_VALIDATION_THRESHOLDS.tooFastSeconds }
                 : isTooSlow
-                  ? LAP_VALIDATION_THRESHOLDS.tooSlowSeconds
-                  : undefined,
+                  ? { threshold: LAP_VALIDATION_THRESHOLDS.tooSlowSeconds }
+                  : {}),
             },
           },
           commentary: sysMsg,

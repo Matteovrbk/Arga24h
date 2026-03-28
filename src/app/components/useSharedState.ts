@@ -133,7 +133,14 @@ function diffAndWrite(database: Database, prev: AppState, next: AppState) {
   if (next.lapFlags !== prev.lapFlags) {
     const prevKeys = new Set(Object.keys(prev.lapFlags));
     Object.entries(next.lapFlags).forEach(([k, v]) => {
-      if (!prevKeys.has(k)) updates[`${P}/lapFlags/${k}`] = v;
+      if (!prevKeys.has(k)) {
+        // Firebase rejects undefined values — strip optional fields that are undefined
+        const clean: Record<string, unknown> = {};
+        Object.entries(v).forEach(([fk, fv]) => {
+          if (fv !== undefined) clean[fk] = fv;
+        });
+        updates[`${P}/lapFlags/${k}`] = clean;
+      }
     });
     // Note: lapFlags are never deleted in the current code, so no removal needed
   }
@@ -176,7 +183,7 @@ export function useSharedState(readonly = false) {
     const handler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setState(JSON.parse(e.newValue));
+          setState(mergeWithDefaults(JSON.parse(e.newValue)));
         } catch {}
       }
     };
@@ -234,20 +241,6 @@ export function useSharedState(readonly = false) {
         diffAndWrite(db, prev, next);
         setTimeout(() => {
           isWritingRef.current = false;
-          // One-time read after the echo-ignore window to catch any concurrent
-          // updates from the other PC that arrived while we were ignoring
-          if (db) {
-            get(ref(db, FIREBASE_PATH))
-              .then((snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                  const merged = mergeWithDefaults(data);
-                  setState(merged);
-                  saveState(merged);
-                }
-              })
-              .catch(() => {});
-          }
         }, 200);
       }
       return next;
