@@ -50,6 +50,11 @@ export interface CommentaryMessage {
   type: "system" | "manual";
 }
 
+export interface MaintenanceState {
+  active: boolean;
+  pausedAt: number | null; // ms timestamp when maintenance was activated
+}
+
 export interface AppState {
   scouts: Scout[];
   bike1: BikeState;
@@ -61,6 +66,7 @@ export interface AppState {
   commentary: CommentaryMessage[];
   lapFlags: Record<string, LapFlag>;
   raceStarted?: boolean;
+  maintenance?: MaintenanceState;
 }
 
 export const INITIAL_BIKE_STATE: BikeState = {
