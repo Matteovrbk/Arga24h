@@ -129,6 +129,7 @@ export function SpectatorView() {
   ];
 
   const filteredRecords = state.lapRecords.filter((r) => {
+    if (r.lapTime < 195) return false; // sub 3:15 physiquement impossible
     if (spectatorFilter === "bike1") return r.bikeId === 1;
     if (spectatorFilter === "bike2") return r.bikeId === 2;
     if (spectatorFilter === "bike3") return r.bikeId === 3;
