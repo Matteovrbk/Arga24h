@@ -587,6 +587,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
         lapFlags: {},
         raceStarted: false,
         eventConfig: DEFAULT_EVENT_CONFIG,
+        pelotonSightings: [],
       }));
       setBike1MapPos(0);
       setBike2MapPos(0);
@@ -1402,7 +1403,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
               >
                 <Bike className="w-3.5 h-3.5" /> J'ai vu le peloton
               </button>
-              {(state.pelotonSightings?.length ?? 0) > 0 && (
+              {allPelotonSightings.length > 0 && (
                 <button
                   onClick={handleUndoPeloton}
                   title="Annuler la dernière observation"
