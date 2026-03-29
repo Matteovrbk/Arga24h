@@ -127,13 +127,44 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
   const recentPelotonSightings = allPelotonSightings
     .filter((ts) => ts >= currentTime * 1000 - 30 * 60 * 1000);
+
+  // Tour estimé — utilise l'intervalle minimum comme référence pour détecter
+  // les passages manqués (intervalle double/triple = k tours ratés)
   let pelotonLapTimeSec: number | null = null;
   if (recentPelotonSightings.length >= 2) {
     const intervals = recentPelotonSightings
       .slice(1)
       .map((ts, i) => (ts - recentPelotonSightings[i]) / 1000);
-    pelotonLapTimeSec = intervals.reduce((a, b) => a + b) / intervals.length;
+    const minInterval = Math.min(...intervals);
+    let totalSec = 0;
+    let totalLaps = 0;
+    intervals.forEach((iv) => {
+      const k = Math.max(1, Math.round(iv / minInterval));
+      totalSec += iv;
+      totalLaps += k;
+    });
+    pelotonLapTimeSec = totalSec / totalLaps;
   }
+
+  // Reconstruction de la série complète avec les passages inférés
+  const inferredTsSet = new Set<number>();
+  let displaySightings = [...recentPelotonSightings];
+  if (pelotonLapTimeSec !== null && recentPelotonSightings.length >= 2) {
+    const lapMs = pelotonLapTimeSec * 1000;
+    displaySightings = [];
+    for (let i = 0; i < recentPelotonSightings.length - 1; i++) {
+      displaySightings.push(recentPelotonSightings[i]);
+      const gap = recentPelotonSightings[i + 1] - recentPelotonSightings[i];
+      const missed = Math.round(gap / lapMs) - 1;
+      for (let j = 1; j <= missed; j++) {
+        const inferred = Math.round(recentPelotonSightings[i] + j * lapMs);
+        displaySightings.push(inferred);
+        inferredTsSet.add(inferred);
+      }
+    }
+    displaySightings.push(recentPelotonSightings[recentPelotonSightings.length - 1]);
+  }
+
   const lastPelotonTs = recentPelotonSightings.at(-1) ?? null;
   const pelotonElapsedSec = lastPelotonTs ? currentTime - lastPelotonTs / 1000 : null;
   let pelotonProgress: number | undefined;
@@ -1495,21 +1526,30 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
             {recentPelotonSightings.length > 0 ? (
               <div>
                 <div className="text-[9px] text-[#555] uppercase tracking-widest mb-1">
-                  Historique 30min ({recentPelotonSightings.length})
+                  Historique 30min ({recentPelotonSightings.length} vus
+                  {inferredTsSet.size > 0 && ` + ${inferredTsSet.size} estimés`})
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {[...recentPelotonSightings].reverse().map((ts) => (
-                    <span
-                      key={ts}
-                      className="text-[9px] font-['Roboto_Mono'] bg-[#0a0a0a] px-1.5 py-0.5 rounded text-[#666]"
-                    >
-                      {new Date(ts).toLocaleTimeString("fr-BE", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </span>
-                  ))}
+                  {[...displaySightings].reverse().map((ts) => {
+                    const isInferred = inferredTsSet.has(ts);
+                    return (
+                      <span
+                        key={ts}
+                        title={isInferred ? "Passage estimé (non observé)" : "Passage observé"}
+                        className={`text-[9px] font-['Roboto_Mono'] px-1.5 py-0.5 rounded ${
+                          isInferred
+                            ? "bg-[#0a0a0a] text-[#eab308]/40 border border-dashed border-[#eab308]/25"
+                            : "bg-[#0a0a0a] text-[#666]"
+                        }`}
+                      >
+                        {isInferred ? "~" : ""}
+                        {new Date(ts).toLocaleTimeString("fr-BE", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
