@@ -60,6 +60,13 @@ function mergeWithDefaults(parsed: Partial<AppState> & { lapRecords?: unknown; c
     lapFlags: parsed.lapFlags && typeof parsed.lapFlags === "object" ? parsed.lapFlags : {},
     raceStarted: parsed.raceStarted ?? true,
     maintenance: parsed.maintenance ?? undefined,
+    pelotonSightings: (() => {
+      const raw = (parsed as { pelotonSightings?: unknown }).pelotonSightings;
+      if (Array.isArray(raw)) return (raw as number[]).filter(Boolean);
+      if (raw && typeof raw === "object")
+        return Object.values(raw as Record<string, number>).filter(Boolean);
+      return [];
+    })(),
   };
 }
 
@@ -154,6 +161,18 @@ function diffAndWrite(database: Database, prev: AppState, next: AppState) {
     });
     prev.commentary.forEach((m) => {
       if (!nextIds.has(m.id)) updates[`${P}/commentary/${m.id}`] = null;
+    });
+  }
+
+  // pelotonSightings — keyed by timestamp ms (additive from single PC, deleteable)
+  if (next.pelotonSightings !== prev.pelotonSightings) {
+    const prevSet = new Set(prev.pelotonSightings ?? []);
+    const nextSet = new Set(next.pelotonSightings ?? []);
+    nextSet.forEach((ts) => {
+      if (!prevSet.has(ts)) updates[`${P}/pelotonSightings/${ts}`] = ts;
+    });
+    prevSet.forEach((ts) => {
+      if (!nextSet.has(ts)) updates[`${P}/pelotonSightings/${ts}`] = null;
     });
   }
 

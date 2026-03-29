@@ -67,6 +67,7 @@ export interface AppState {
   lapFlags: Record<string, LapFlag>;
   raceStarted?: boolean;
   maintenance?: MaintenanceState;
+  pelotonSightings?: number[]; // timestamps ms de chaque passage du peloton à S/F
 }
 
 export const INITIAL_BIKE_STATE: BikeState = {
