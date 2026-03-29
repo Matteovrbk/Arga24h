@@ -146,6 +146,7 @@ interface CircuitSVGProps {
   bike3Rider?: string;
   dark?: boolean;
   compact?: boolean;
+  pelotonProgress?: number;
 }
 
 export function CircuitSVG({
@@ -160,10 +161,15 @@ export function CircuitSVG({
   bike3Rider,
   dark = false,
   compact = false,
+  pelotonProgress,
 }: CircuitSVGProps) {
   const pos1 = useMemo(() => getPositionOnCircuit(bike1Progress), [bike1Progress]);
   const pos2 = useMemo(() => getPositionOnCircuit(bike2Progress), [bike2Progress]);
   const pos3 = useMemo(() => getPositionOnCircuit(bike3Progress), [bike3Progress]);
+  const posPeloton = useMemo(
+    () => pelotonProgress !== undefined ? getPositionOnCircuit(pelotonProgress) : null,
+    [pelotonProgress],
+  );
 
   // Ligne départ/arrivée (petit segment perpendiculaire)
   const startFinish: LatLngExpression[] = [
@@ -241,6 +247,24 @@ export function CircuitSVG({
             S/F
           </Tooltip>
         </CircleMarker>
+
+        {/* Peloton */}
+        {posPeloton && (
+          <CircleMarker
+            center={posPeloton}
+            radius={9}
+            pathOptions={{
+              fillColor: "#eab308",
+              color: "#fff",
+              weight: 2,
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -12]} className="circuit-tooltip">
+              PELOTON
+            </Tooltip>
+          </CircleMarker>
+        )}
 
         {/* Vélo 1 */}
         {bike1Active && (

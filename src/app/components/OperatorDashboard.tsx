@@ -16,6 +16,7 @@ import {
   BellOff,
   Wrench,
   History,
+  Bike,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -45,6 +46,7 @@ import {
   DEFAULT_EVENT_CONFIG,
   LAP_VALIDATION_THRESHOLDS,
   formatTimeFull,
+  formatTimeShort,
   formatDuration,
   bikeName,
   bikeShortLabel,
@@ -113,6 +115,34 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const bike1Progress = bike1AvgLap > 0 && state.bike1.lapStartTime !== null ? Math.min(0.99, bike1Elapsed / bike1AvgLap) : bike1MapPos;
   const bike2Progress = bike2AvgLap > 0 && state.bike2.lapStartTime !== null ? Math.min(0.99, bike2Elapsed / bike2AvgLap) : bike2MapPos;
   const bike3Progress = bike3AvgLap > 0 && state.bike3.lapStartTime !== null ? Math.min(0.99, bike3Elapsed / bike3AvgLap) : bike3MapPos;
+
+  // ── Peloton tracking ──────────────────────────────────────────
+  const recentPelotonSightings = [...(state.pelotonSightings ?? [])]
+    .filter((ts) => ts >= currentTime * 1000 - 30 * 60 * 1000)
+    .sort((a, b) => a - b);
+  let pelotonLapTimeSec: number | null = null;
+  if (recentPelotonSightings.length >= 2) {
+    const intervals = recentPelotonSightings
+      .slice(1)
+      .map((ts, i) => (ts - recentPelotonSightings[i]) / 1000);
+    pelotonLapTimeSec = intervals.reduce((a, b) => a + b) / intervals.length;
+  }
+  const lastPelotonTs = recentPelotonSightings.at(-1) ?? null;
+  const pelotonElapsedSec = lastPelotonTs ? currentTime - lastPelotonTs / 1000 : null;
+  let pelotonProgress: number | undefined;
+  let pelotonTimeUntilReturn: number | null = null;
+  if (pelotonElapsedSec !== null && pelotonLapTimeSec !== null) {
+    pelotonProgress = (pelotonElapsedSec / pelotonLapTimeSec) % 1;
+    pelotonTimeUntilReturn = (1 - pelotonProgress) * pelotonLapTimeSec;
+  }
+  const calcPelotonGap = (bikeProgress: number, avgLapSec: number): number | null => {
+    if (pelotonProgress === undefined || avgLapSec <= 0) return null;
+    let diff = pelotonProgress - bikeProgress;
+    if (diff > 0.5) diff -= 1;
+    if (diff < -0.5) diff += 1;
+    return diff * avgLapSec; // positif = peloton devant, négatif = vélo devant
+  };
+
   const [showScoutManager, setShowScoutManager] = useState(false);
   const [showEventSetup, setShowEventSetup] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
@@ -710,6 +740,23 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
   const maintenanceActive = !!state.maintenance?.active;
 
+  const handlePelotonSighting = useCallback(() => {
+    const ts = Date.now();
+    updateState((prev) => ({
+      ...prev,
+      pelotonSightings: [...(prev.pelotonSightings ?? []), ts],
+    }));
+    toast.success("Peloton enregistré !", { duration: 2000 });
+  }, [updateState]);
+
+  const handleUndoPeloton = useCallback(() => {
+    updateState((prev) => {
+      const sightings = [...(prev.pelotonSightings ?? [])];
+      sightings.pop();
+      return { ...prev, pelotonSightings: sightings };
+    });
+  }, [updateState]);
+
   const rider1 = state.scouts.find((s) => s.id === state.bike1.currentRiderId);
   const rider2 = state.scouts.find((s) => s.id === state.bike2.currentRiderId);
   const rider3 = state.scouts.find((s) => s.id === state.bike3.currentRiderId);
@@ -1089,6 +1136,18 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 <span className="hidden md:inline">{maintenanceActive ? "Fin Maintenance" : "Maintenance"}</span>
               </button>
               <button
+                onClick={handlePelotonSighting}
+                title="J'ai vu le peloton"
+                className="p-1.5 bg-[#222] hover:bg-[#eab308]/20 border border-[#333] hover:border-[#eab308]/50 rounded text-[#eab308] transition-colors relative"
+              >
+                <Bike className="w-4 h-4" />
+                {recentPelotonSightings.length > 0 && (
+                  <span className="absolute -top-1 -right-1 text-[8px] bg-[#eab308] text-black rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold leading-none">
+                    {recentPelotonSightings.length}
+                  </span>
+                )}
+              </button>
+              <button
                 onClick={() => navigate("/admin/historique")}
                 title="Historique des tours"
                 className="p-1.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[#888] hover:text-white transition-colors"
@@ -1210,23 +1269,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
       {/* ── Main content ───────────────────────────────────── */}
       <main className="max-w-[1800px] mx-auto p-4 space-y-4">
-        {/* Race control bar — visible uniquement avant le lancement */}
-        {!state.raceStarted && (
-          <div className="bg-[#111] rounded-md border border-[#222] p-3 flex items-center gap-3 flex-wrap">
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-[#888] uppercase tracking-widest">Course pas encore lancee</div>
-              <div className="text-xs text-[#555] mt-0.5">Configurez l'evenement et lancez le chrono</div>
-            </div>
-            <button
-              onClick={() => setShowEventSetup(true)}
-              className="px-5 py-2.5 bg-[#22c55e] text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-[#16a34a] transition-colors shadow-lg shadow-green-900/30 flex items-center gap-2"
-            >
-              <Settings2 className="w-4 h-4" />
-              Configurer et Lancer
-            </button>
-          </div>
-        )}
-
         {/* Scout manager panel */}
         {showScoutManager && (
           <div className="mb-6 p-4 bg-[#111] border border-[#222] rounded-md shadow-xl">
@@ -1281,8 +1323,8 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
 
-        {/* Map + Leaderboard */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Map + Peloton + Leaderboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Map */}
           <div className="hidden md:flex bg-[#111] rounded-md border border-[#222] overflow-hidden flex-col max-h-[380px]">
             <div className="px-4 py-2 border-b border-[#222] flex items-center justify-between bg-[#151515] flex-shrink-0">
@@ -1300,6 +1342,12 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                   <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BIKE3_COLOR, opacity: rider3 ? 1 : 0.3 }} />
                   <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#ccc]">VPi</span>
                 </div>
+                {pelotonProgress !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full animate-pulse bg-[#eab308]" />
+                    <span className="text-[10px] uppercase font-['Roboto_Mono'] text-[#eab308]">PLT</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-4 bg-[#050505] min-h-[250px] flex items-center justify-center relative">
@@ -1317,9 +1365,140 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
                 bike1Rider={rider1?.name}
                 bike2Rider={rider2?.name}
                 bike3Rider={rider3?.name}
+                pelotonProgress={pelotonProgress}
                 dark
               />
             </div>
+          </div>
+
+          {/* Peloton */}
+          <div className="bg-[#111] rounded-md border border-[#eab308]/30 p-4 shadow-lg shadow-black/50 flex flex-col gap-3">
+            <h2 className="text-xs uppercase tracking-widest text-[#888] font-bold flex items-center gap-2">
+              <Bike className="w-3.5 h-3.5 text-[#eab308]" /> Peloton
+            </h2>
+
+            {/* Bouton principal */}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePelotonSighting}
+                className="flex-1 py-2.5 bg-[#eab308] hover:bg-[#ca8a04] text-black text-[10px] font-bold uppercase tracking-widest rounded flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Bike className="w-3.5 h-3.5" /> J'ai vu le peloton
+              </button>
+              {(state.pelotonSightings?.length ?? 0) > 0 && (
+                <button
+                  onClick={handleUndoPeloton}
+                  title="Annuler la dernière observation"
+                  className="px-2.5 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-[#666] hover:text-[#e11d48] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Stats si ≥ 1 observation */}
+            {lastPelotonTs && (
+              <div className="text-[9px] text-[#555] uppercase tracking-widest">
+                Dernier passage :{" "}
+                <span className="text-[#eab308] font-['Roboto_Mono']">
+                  {new Date(lastPelotonTs).toLocaleTimeString("fr-BE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </span>
+              </div>
+            )}
+
+            {/* Tour estimé + countdown si ≥ 2 observations */}
+            {pelotonLapTimeSec !== null && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-[#0a0a0a] rounded p-2 text-center">
+                  <div className="text-[9px] text-[#555] uppercase tracking-widest">Tour estimé</div>
+                  <div className="font-['Roboto_Mono'] text-sm font-bold text-[#eab308] mt-0.5">
+                    {formatTimeShort(pelotonLapTimeSec)}
+                  </div>
+                </div>
+                <div className="bg-[#0a0a0a] rounded p-2 text-center">
+                  <div className="text-[9px] text-[#555] uppercase tracking-widest">Prochain S/F</div>
+                  <div
+                    className={`font-['Roboto_Mono'] text-sm font-bold mt-0.5 ${
+                      pelotonTimeUntilReturn !== null && pelotonTimeUntilReturn < 60
+                        ? "text-[#e11d48]"
+                        : "text-white"
+                    }`}
+                  >
+                    {pelotonTimeUntilReturn !== null ? formatTimeShort(pelotonTimeUntilReturn) : "—"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Écarts par vélo */}
+            {pelotonProgress !== undefined && (
+              <div className="space-y-1">
+                <div className="text-[9px] text-[#555] uppercase tracking-widest">Écart avec nos vélos</div>
+                {(
+                  [
+                    { label: "V1", color: BIKE1_COLOR, prog: bike1Progress, avg: bike1AvgLap, rider: rider1 },
+                    { label: "V2", color: BIKE2_COLOR, prog: bike2Progress, avg: bike2AvgLap, rider: rider2 },
+                    { label: "VPi", color: BIKE3_COLOR, prog: bike3Progress, avg: bike3AvgLap, rider: rider3 },
+                  ] as const
+                ).map(({ label, color, prog, avg, rider }) => {
+                  const gap = calcPelotonGap(prog, avg);
+                  if (gap === null || !rider) return null;
+                  const ahead = gap < 0; // notre vélo est en avance
+                  return (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between bg-[#0a0a0a] rounded px-2 py-1"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-[9px] font-['Roboto_Mono'] text-[#888]">
+                          {label} {rider.name.split(" ")[0]}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-['Roboto_Mono'] font-bold ${
+                          ahead ? "text-[#22c55e]" : "text-[#f97316]"
+                        }`}
+                      >
+                        {ahead ? "↑ +" : "↓ "}
+                        {formatTimeShort(Math.abs(gap))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Historique 30min */}
+            {recentPelotonSightings.length > 0 ? (
+              <div>
+                <div className="text-[9px] text-[#555] uppercase tracking-widest mb-1">
+                  Historique 30min ({recentPelotonSightings.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {[...recentPelotonSightings].reverse().map((ts) => (
+                    <span
+                      key={ts}
+                      className="text-[9px] font-['Roboto_Mono'] bg-[#0a0a0a] px-1.5 py-0.5 rounded text-[#666]"
+                    >
+                      {new Date(ts).toLocaleTimeString("fr-BE", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-[#444] text-center py-1">
+                Aucune observation dans les 30 dernières minutes
+              </div>
+            )}
           </div>
 
           {/* Leaderboard */}
