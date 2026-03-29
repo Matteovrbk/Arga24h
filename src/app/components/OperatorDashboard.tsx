@@ -204,13 +204,6 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Nettoyage localPelotonRef : retirer les ts confirmés par Firebase
-  useEffect(() => {
-    const confirmed = new Set(state.pelotonSightings ?? []);
-    localPelotonRef.current.forEach((ts) => {
-      if (confirmed.has(ts)) localPelotonRef.current.delete(ts);
-    });
-  }, [state.pelotonSightings]);
 
   // Simulate GPS
   useEffect(() => {
