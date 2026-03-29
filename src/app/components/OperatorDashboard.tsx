@@ -117,9 +117,16 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const bike3Progress = bike3AvgLap > 0 && state.bike3.lapStartTime !== null ? Math.min(0.99, bike3Elapsed / bike3AvgLap) : bike3MapPos;
 
   // ── Peloton tracking ──────────────────────────────────────────
-  const recentPelotonSightings = [...(state.pelotonSightings ?? [])]
-    .filter((ts) => ts >= currentTime * 1000 - 30 * 60 * 1000)
-    .sort((a, b) => a - b);
+  // localPelotonRef: timestamps ajoutés localement mais pas encore confirmés par Firebase.
+  // Évite que onValue (déclenché par PC2) ne les écrase avant la confirmation Firebase.
+  const localPelotonRef = useRef<Set<number>>(new Set());
+
+  const allPelotonSightings = [
+    ...new Set([...(state.pelotonSightings ?? []), ...localPelotonRef.current]),
+  ].sort((a, b) => a - b);
+
+  const recentPelotonSightings = allPelotonSightings
+    .filter((ts) => ts >= currentTime * 1000 - 30 * 60 * 1000);
   let pelotonLapTimeSec: number | null = null;
   if (recentPelotonSightings.length >= 2) {
     const intervals = recentPelotonSightings
@@ -165,6 +172,14 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
     const interval = setInterval(() => setCurrentTime(Date.now() / 1000), 100);
     return () => clearInterval(interval);
   }, []);
+
+  // Nettoyage localPelotonRef : retirer les ts confirmés par Firebase
+  useEffect(() => {
+    const confirmed = new Set(state.pelotonSightings ?? []);
+    localPelotonRef.current.forEach((ts) => {
+      if (confirmed.has(ts)) localPelotonRef.current.delete(ts);
+    });
+  }, [state.pelotonSightings]);
 
   // Simulate GPS
   useEffect(() => {
@@ -742,6 +757,7 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
 
   const handlePelotonSighting = useCallback(() => {
     const ts = Date.now();
+    localPelotonRef.current.add(ts);
     updateState((prev) => ({
       ...prev,
       pelotonSightings: [...(prev.pelotonSightings ?? []), ts],
@@ -752,7 +768,8 @@ function OperatorDashboardInner({ onLogout }: { onLogout: () => void }) {
   const handleUndoPeloton = useCallback(() => {
     updateState((prev) => {
       const sightings = [...(prev.pelotonSightings ?? [])];
-      sightings.pop();
+      const removed = sightings.pop();
+      if (removed !== undefined) localPelotonRef.current.delete(removed);
       return { ...prev, pelotonSightings: sightings };
     });
   }, [updateState]);
