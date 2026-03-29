@@ -249,7 +249,7 @@ export function CircuitSVG({
         </CircleMarker>
 
         {/* Peloton */}
-        {posPeloton && (
+        {posPeloton !== null && (
           <CircleMarker
             center={posPeloton}
             radius={9}
